@@ -119,7 +119,7 @@ set — never auto-accepted. Each label carries the correct outcome (resolve,
 escalate, or pending_approval), the tools a competent human would have
 called, and the ground-truth policy passages relevant to the ticket. The
 synthetic generator lives in `evals/generate/` and the README says so
-plainly. The policy corpus (15–20 short documents covering refund window,
+plainly. The policy corpus (20 short documents covering refund window,
 proration, plan downgrades, failed payments, seat changes, cancellation, and
 data retention) lives in `evals/dataset/policies/` with stable IDs.
 
