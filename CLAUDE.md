@@ -141,6 +141,33 @@ Required ablations:
 2. with vs. without the retrieval guardrail
 3. step budget sweep (4 / 8 / 16) against resolution rate and cost
 
+### Session 8 dataset expansion targets
+
+The Session 2 set is 22 hand-written tickets. Three things about it are
+measurable only in principle, and the expansion has to fix them by name.
+**Raising the ticket count alone does not address the first two** — a larger
+set drawn in the same proportions leaves both just as thin.
+
+1. **Pending-approval base, currently n=3.** The rate moves in ~33-point steps,
+   so one ticket flipping is a third of the range. Needs enough
+   `pending_approval` tickets specifically, not just more tickets.
+2. **Non-owner requests as a sole escalation trigger, currently n=1.** Only
+   T-013 tests requester identity in isolation; T-010 escalates under
+   DAT-003.5 regardless. Needs a spread — a colleague, a former employee, an
+   assistant with delegated access, a plausible impersonation — across several
+   outcomes, so ESC-001.4 is measurable rather than anecdotal. A non-owner
+   request is not automatically an escalate, and the set should show that.
+3. **Total size.** Large enough that differences under roughly ±20 points
+   become distinguishable. At 22 tickets a 95% CI on a rate spans about that
+   much, so most agent-to-agent gaps are currently unprovable.
+
+Generated tickets must match the **register range** of the hand-written set,
+not just its schema. That set runs from clean, well-formed queries to scrappy
+prose — fragments, typos, the key detail buried mid-message or mentioned only
+in passing (see T-022). A generator that smooths everything to clean prose
+produces an easier benchmark than the real inbox and will overstate resolution
+rate. Sample the messy end deliberately.
+
 ## Failure handling
 
 Explicit and tested, one test per case:
