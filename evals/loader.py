@@ -7,7 +7,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from evals.schema import Customer, Ticket, Tool
+from evals.schema import Customer, Outcome, Ticket, Tool
 
 DATASET_DIR = Path(__file__).parent / "dataset"
 POLICY_DIR = DATASET_DIR / "policies"
@@ -85,6 +85,21 @@ def load_tickets(
         raise ValueError(
             f"tickets expect search_past_tickets but their customer has no "
             f"prior history: {barren}"
+        )
+
+    # ESC-001.4 escalates any request from someone not verified as the account
+    # owner. Comparing requester_email to owner_email makes that check
+    # mechanical rather than something the agent has to infer from prose.
+    unowned_but_not_escalated = [
+        t.ticket_id
+        for t in tickets
+        if t.requester_email != customers[t.customer_id].owner_email
+        and t.labels.outcome is not Outcome.ESCALATE
+    ]
+    if unowned_but_not_escalated:
+        raise ValueError(
+            f"tickets from a non-owner requester must be labeled escalate per "
+            f"ESC-001.4: {unowned_but_not_escalated}"
         )
 
     return tickets

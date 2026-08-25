@@ -2,6 +2,7 @@
   {
     "ticket_id": "T-001",
     "customer_id": "CUST-1042",
+    "requester_email": "r.mehta@brightfold.example",
     "body": "Hi - I need to get all of our project data out of the product for an internal review next week. Is there a way to download everything at once, and what format does it come in?",
     "labels": {
       "outcome": "resolve",
@@ -14,6 +15,7 @@
   {
     "ticket_id": "T-002",
     "customer_id": "CUST-1108",
+    "requester_email": "sam.ellery@quillbrook.example",
     "body": "Quick question before I put this on the company card: does the Pro plan include API access, or is that Team only? And how much storage do I get on Pro?",
     "labels": {
       "outcome": "resolve",
@@ -26,6 +28,7 @@
   {
     "ticket_id": "T-003",
     "customer_id": "CUST-1177",
+    "requester_email": "t.nakamura@sableline.example",
     "body": "I got an email saying my payment failed. I've been travelling for work and only just saw it. Am I about to lose access to my projects? I can sort the card out at the weekend but not before.",
     "labels": {
       "outcome": "resolve",
@@ -38,6 +41,7 @@
   {
     "ticket_id": "T-004",
     "customer_id": "CUST-1203",
+    "requester_email": "j.arden@fernwick.example",
     "body": "I was charged $29 on the 18th but I've decided this isn't the right tool for us. Please cancel the subscription and refund that charge.",
     "labels": {
       "outcome": "resolve",
@@ -50,6 +54,7 @@
   {
     "ticket_id": "T-005",
     "customer_id": "CUST-1250",
+    "requester_email": "priya.raman@holtwood.example",
     "body": "We're onboarding two more engineers on Monday. If I add their seats now, do we get billed straight away or does it wait until our renewal on the 1st? Trying to work out whether to hold off a week.",
     "labels": {
       "outcome": "resolve",
@@ -62,6 +67,7 @@
   {
     "ticket_id": "T-006",
     "customer_id": "CUST-1288",
+    "requester_email": "m.delacroix@varnhill.example",
     "body": "I requested an export a couple of weeks ago and got busy - now the download link says it's expired. Can you generate a new one for me? I'm the account owner.",
     "labels": {
       "outcome": "resolve",
@@ -74,6 +80,7 @@
   {
     "ticket_id": "T-007",
     "customer_id": "CUST-1301",
+    "requester_email": "k.oyelaran@stonebridge-ux.example",
     "body": "I'm thinking of dropping back to the free plan now that the contract I bought this for has ended. I've got 12 projects and about 8GB of files in the account. What actually happens to all of that if I downgrade? I don't want to lose the work.",
     "labels": {
       "outcome": "resolve",
@@ -86,6 +93,7 @@
   {
     "ticket_id": "T-008",
     "customer_id": "CUST-1355",
+    "requester_email": "l.hartmann@pinecrest-io.example",
     "body": "Two people left the team last week and I removed their seats straight away, so we're down to three. This month's invoice hasn't changed at all. Can you credit us for the two seats for the rest of the month?",
     "labels": {
       "outcome": "resolve",
@@ -98,6 +106,7 @@
   {
     "ticket_id": "T-009",
     "customer_id": "CUST-1560",
+    "requester_email": "d.moreau@ashgrove.example",
     "body": "I disputed the August charge with my bank last week because nobody got back to me about it. I'd still like the refund processed on your side as well so this is properly sorted out.",
     "labels": {
       "outcome": "escalate",
@@ -110,6 +119,7 @@
   {
     "ticket_id": "T-010",
     "customer_id": "CUST-1595",
+    "requester_email": "j.whitfield@ashby-legal.example",
     "body": "I am writing on behalf of my client in relation to the account below. My client requires that all personal data held about them be erased under applicable data protection law, within one month of this request. Please confirm in writing once this has been completed.",
     "labels": {
       "outcome": "escalate",
@@ -122,6 +132,7 @@
   {
     "ticket_id": "T-011",
     "customer_id": "CUST-1622",
+    "requester_email": "y.tanaka@copperline.example",
     "body": "There are two logins in my audit log from a country I have never been to, and a project was deleted this morning that I definitely did not delete. I've changed my password already. What happened, and can the project be brought back?",
     "labels": {
       "outcome": "escalate",
@@ -134,6 +145,7 @@
   {
     "ticket_id": "T-012",
     "customer_id": "CUST-1650",
+    "requester_email": "b.fitzgerald@marlowe-group.example",
     "body": "We stopped using this back in March and I've just realised we're still paying for it. I want the whole year refunded - that's $1,584 for six seats we haven't touched in months. If that's not possible I'll be speaking to our lawyer about it and I'll be making sure people hear about this on Twitter.",
     "labels": {
       "outcome": "escalate",
@@ -146,6 +158,7 @@
   {
     "ticket_id": "T-013",
     "customer_id": "CUST-1688",
+    "requester_email": "m.brennan@harlow-digital.example",
     "body": "Hi, I work with Dana who originally set up our account - she's on parental leave until November. We don't need the subscription any more. Can you cancel it and refund this month's charge? Happy to give you any details you need.",
     "labels": {
       "outcome": "escalate",
@@ -158,6 +171,7 @@
   {
     "ticket_id": "T-014",
     "customer_id": "CUST-1710",
+    "requester_email": "g.petrov@northgate-labs.example",
     "body": "We're planning to roll this out to around 80 people in Q4. Our procurement team won't put it on a card - they need to pay by purchase order against an annual contract, and legal will want to review terms. Who should I be talking to?",
     "labels": {
       "outcome": "escalate",
@@ -170,6 +184,7 @@
   {
     "ticket_id": "T-015",
     "customer_id": "CUST-1745",
+    "requester_email": "e.sandoval@bramblewood.example",
     "body": "I've been charged twice for August - invoice INV-88213 on the 2nd and INV-88547 on the 4th, same amount both times. On top of that the billing page is now showing an outstanding balance of $58 which makes no sense to me. Nothing changed on our side, we haven't added anyone.",
     "labels": {
       "outcome": "escalate",
@@ -182,6 +197,7 @@
   {
     "ticket_id": "T-016",
     "customer_id": "CUST-1782",
+    "requester_email": "h.ibrahim@calderstone.example",
     "body": "Our annual plan renewed 10 days ago for $1,584 and we absolutely did not mean to let that happen - we'd agreed internally in June to drop it and someone forgot to action it. Nobody has logged in since May. Please refund the renewal and cancel us.",
     "labels": {
       "outcome": "escalate",
@@ -194,6 +210,7 @@
   {
     "ticket_id": "T-017",
     "customer_id": "CUST-1420",
+    "requester_email": "a.bellini@driftwood-labs.example",
     "body": "I started a trial on 13 July to evaluate this for a project that then got cancelled. I hadn't realised it would roll into a paid annual plan - I was charged $290 on 27 July and only spotted it on my statement today. I've not logged in since the trial. Can I have that refunded please? It's been under 30 days.",
     "labels": {
       "outcome": "pending_approval",
@@ -206,6 +223,7 @@
   {
     "ticket_id": "T-018",
     "customer_id": "CUST-1455",
+    "requester_email": "n.kowalski@embermoor.example",
     "body": "We're winding this project down at the end of the month. I'd like to move us straight from Team to the free plan and keep the workspace around read-only so we can refer back to it. There are six of us on the account at the moment. Can you switch us over?",
     "labels": {
       "outcome": "escalate",
@@ -218,6 +236,7 @@
   {
     "ticket_id": "T-019",
     "customer_id": "CUST-1490",
+    "requester_email": "c.vasquez@tidewater-dev.example",
     "body": "My card got declined and I know I'm into the grace period now. I get paid on the 5th and I can settle it then. Can you give me an extra week before you lock the account? Losing access mid-project would really hurt us.",
     "labels": {
       "outcome": "resolve",
@@ -230,6 +249,7 @@
   {
     "ticket_id": "T-020",
     "customer_id": "CUST-1520",
+    "requester_email": "s.abiodun@larkfield.example",
     "body": "We waited three days for a reply on a production problem last week, on a plan that's sold with a four hour response target. This is the second time this quarter. I want the month credited back - that's $132 for our six seats.",
     "labels": {
       "outcome": "resolve",
@@ -242,6 +262,7 @@
   {
     "ticket_id": "T-021",
     "customer_id": "CUST-1834",
+    "requester_email": "w.novak@fenwick-pilot.example",
     "body": "We've decided not to continue with this after the pilot. Our monthly charge of $176 for the eight seats went through on 13 August and I'd like that refunded and the account closed, please. Nobody has been in the account since the pilot wrapped up at the end of July.",
     "labels": {
       "outcome": "pending_approval",
@@ -254,7 +275,8 @@
   {
     "ticket_id": "T-022",
     "customer_id": "CUST-1867",
-    "body": "hi so this is probably partly our fault. we were meant to cancel before the renewal, my colleague had it on his list and then he was off sick and it just didnt happen. so we got billed again on the 18th, full whack for all twelve seats, 264. nobody has touched the account since july i checked the logs myself. can we get that back? happy to close it out properly this time just tell me what you need. also seperately is there a way to pull down what we did have in there before it all goes, not urgent but would be good to have",
+    "requester_email": "r.duval@saltmarsh-co.example",
+    "body": "hi so this is probably partly our fault. i set the account up originally so this one's on me. we were meant to cancel before the renewal, i had it on my list and then i was off sick and it just didnt happen. so we got billed again on the 18th, full whack for all twelve seats, 264. nobody has touched the account since july i checked the logs myself. can we get that back? happy to close it out properly this time just tell me what you need. also seperately is there a way to pull down what we did have in there before it all goes, not urgent but would be good to have",
     "labels": {
       "outcome": "pending_approval",
       "expected_tools": ["lookup_customer", "retrieve_policy", "issue_refund"],

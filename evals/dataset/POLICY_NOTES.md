@@ -90,8 +90,16 @@ prior contacts `search_past_tickets` searches. Every ticket's `customer_id`
 has a record, because a tool that cannot return anything cannot inform an
 answer — crediting such a call would inflate tool-call precision.
 
+Each record also carries an `owner_email`, paired with a `requester_email` on
+every ticket. ESC-001.4 turns on whether the requester is the verified account
+owner, so that comparison has to be mechanical — otherwise T-013's escalate
+label depends on an agent reading intent out of the prose. T-013 (a colleague
+of an owner on leave) and T-010 (outside counsel) are the two non-owner
+requests; only T-013 escalates on identity alone.
+
 `loader.load_tickets` enforces this: a ticket listing `search_past_tickets` in
-`expected_tools` whose customer has no `past_tickets` fails the load. Only
+`expected_tools` whose customer has no `past_tickets` fails the load, as does a
+non-owner request labeled anything other than escalate. Only
 T-009, T-015 and T-020 carry history, and in each case the history changes the
 answer — two ignored contacts before a chargeback, a prior unexplained $58 line
 item, and two confirmed slow responses respectively.

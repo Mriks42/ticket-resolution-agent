@@ -1,6 +1,7 @@
 {
   "CUST-1042": {
     "customer_id": "CUST-1042",
+    "owner_email": "r.mehta@brightfold.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "monthly",
@@ -11,6 +12,7 @@
   },
   "CUST-1108": {
     "customer_id": "CUST-1108",
+    "owner_email": "sam.ellery@quillbrook.example",
     "plan": "free",
     "seats": 1,
     "billing_cycle": null,
@@ -21,6 +23,7 @@
   },
   "CUST-1177": {
     "customer_id": "CUST-1177",
+    "owner_email": "t.nakamura@sableline.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "monthly",
@@ -31,6 +34,7 @@
   },
   "CUST-1203": {
     "customer_id": "CUST-1203",
+    "owner_email": "j.arden@fernwick.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "monthly",
@@ -41,6 +45,7 @@
   },
   "CUST-1250": {
     "customer_id": "CUST-1250",
+    "owner_email": "priya.raman@holtwood.example",
     "plan": "team",
     "seats": 5,
     "billing_cycle": "monthly",
@@ -51,6 +56,7 @@
   },
   "CUST-1288": {
     "customer_id": "CUST-1288",
+    "owner_email": "m.delacroix@varnhill.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "monthly",
@@ -61,6 +67,7 @@
   },
   "CUST-1301": {
     "customer_id": "CUST-1301",
+    "owner_email": "k.oyelaran@stonebridge-ux.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "monthly",
@@ -71,6 +78,7 @@
   },
   "CUST-1355": {
     "customer_id": "CUST-1355",
+    "owner_email": "l.hartmann@pinecrest-io.example",
     "plan": "team",
     "seats": 3,
     "billing_cycle": "monthly",
@@ -81,6 +89,7 @@
   },
   "CUST-1420": {
     "customer_id": "CUST-1420",
+    "owner_email": "a.bellini@driftwood-labs.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "annual",
@@ -91,6 +100,7 @@
   },
   "CUST-1455": {
     "customer_id": "CUST-1455",
+    "owner_email": "n.kowalski@embermoor.example",
     "plan": "team",
     "seats": 6,
     "billing_cycle": "monthly",
@@ -101,6 +111,7 @@
   },
   "CUST-1490": {
     "customer_id": "CUST-1490",
+    "owner_email": "c.vasquez@tidewater-dev.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "monthly",
@@ -111,6 +122,7 @@
   },
   "CUST-1520": {
     "customer_id": "CUST-1520",
+    "owner_email": "s.abiodun@larkfield.example",
     "plan": "team",
     "seats": 6,
     "billing_cycle": "monthly",
@@ -134,6 +146,7 @@
   },
   "CUST-1560": {
     "customer_id": "CUST-1560",
+    "owner_email": "d.moreau@ashgrove.example",
     "plan": "team",
     "seats": 4,
     "billing_cycle": "monthly",
@@ -157,6 +170,7 @@
   },
   "CUST-1595": {
     "customer_id": "CUST-1595",
+    "owner_email": "p.lindqvist@wrenmore.example",
     "plan": "pro",
     "seats": 1,
     "billing_cycle": "monthly",
@@ -167,6 +181,7 @@
   },
   "CUST-1622": {
     "customer_id": "CUST-1622",
+    "owner_email": "y.tanaka@copperline.example",
     "plan": "team",
     "seats": 6,
     "billing_cycle": "monthly",
@@ -177,6 +192,7 @@
   },
   "CUST-1650": {
     "customer_id": "CUST-1650",
+    "owner_email": "b.fitzgerald@marlowe-group.example",
     "plan": "team",
     "seats": 6,
     "billing_cycle": "annual",
@@ -187,6 +203,7 @@
   },
   "CUST-1688": {
     "customer_id": "CUST-1688",
+    "owner_email": "dana.okafor@harlow-digital.example",
     "plan": "team",
     "seats": 4,
     "billing_cycle": "monthly",
@@ -197,6 +214,7 @@
   },
   "CUST-1710": {
     "customer_id": "CUST-1710",
+    "owner_email": "g.petrov@northgate-labs.example",
     "plan": "team",
     "seats": 5,
     "billing_cycle": "monthly",
@@ -207,6 +225,7 @@
   },
   "CUST-1745": {
     "customer_id": "CUST-1745",
+    "owner_email": "e.sandoval@bramblewood.example",
     "plan": "team",
     "seats": 6,
     "billing_cycle": "monthly",
@@ -224,6 +243,7 @@
   },
   "CUST-1782": {
     "customer_id": "CUST-1782",
+    "owner_email": "h.ibrahim@calderstone.example",
     "plan": "team",
     "seats": 6,
     "billing_cycle": "annual",
@@ -234,6 +254,7 @@
   },
   "CUST-1834": {
     "customer_id": "CUST-1834",
+    "owner_email": "w.novak@fenwick-pilot.example",
     "plan": "team",
     "seats": 8,
     "billing_cycle": "monthly",
@@ -244,6 +265,7 @@
   },
   "CUST-1867": {
     "customer_id": "CUST-1867",
+    "owner_email": "r.duval@saltmarsh-co.example",
     "plan": "team",
     "seats": 12,
     "billing_cycle": "monthly",

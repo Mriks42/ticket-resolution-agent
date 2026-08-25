@@ -24,8 +24,20 @@ python -m evals.run --agent pkg.mod:MyAgent --out evals/report/mine.json
 
 Gold outcome distribution is 10 resolve / 9 escalate / 3 pending_approval.
 `loader.py` refuses to load a dataset with duplicate ticket ids, policy ids
-absent from the corpus, customers without fixtures, or a ticket expecting
-`search_past_tickets` from a customer with no history.
+absent from the corpus, customers without fixtures, a ticket expecting
+`search_past_tickets` from a customer with no history, or a non-owner request
+labeled anything other than escalate.
+
+## Requester identity
+
+Each customer record carries an `owner_email` and each ticket a
+`requester_email`. `ESC-001.4` escalates any request from someone not verified
+as the account owner, and comparing those two fields makes that check
+mechanical rather than something an agent has to infer from prose. Two tickets
+are sent by a non-owner: T-013 (a colleague of the owner, who is on leave) and
+T-010 (outside counsel writing on a client's behalf). T-013 is the case where
+identity is the *only* escalation trigger; T-010 would escalate under
+`DAT-003.5` regardless.
 
 ## Known limitations
 
@@ -45,6 +57,13 @@ to present noise as a result.
   difference in it as signal. Session 8's dataset expansion has to raise this
   base meaningfully; the other three metrics scale with the ticket count, but
   this one needs `pending_approval` tickets specifically.
+- **Non-owner requests have n=1 as a sole trigger.** Only T-013 tests requester
+  identity in isolation (T-010 escalates on legal grounds too), so the harness
+  cannot distinguish an agent that checks `requester_email` against
+  `owner_email` from one that got T-013 right for another reason. Session 8
+  should generate a spread of non-owner cases — a colleague, a former employee,
+  an assistant with delegated access, a plausible impersonation — across
+  several outcomes, so that `ESC-001.4` is measurable rather than anecdotal.
 - **A zero-width CI means a constant, not a certainty.** When an agent scores 0
   on every ticket, every bootstrap resample returns 0 and the interval collapses
   to `[0.000, 0.000]`. The run output flags this. It is the absence of

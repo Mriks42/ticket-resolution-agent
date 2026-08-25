@@ -65,6 +65,7 @@ class Ticket(BaseModel):
 
     ticket_id: str
     customer_id: str
+    requester_email: str
     body: str
     labels: TicketLabels
 
@@ -99,6 +100,7 @@ class Customer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     customer_id: str
+    owner_email: str
     plan: Plan
     seats: int
     billing_cycle: Literal["monthly", "annual"] | None

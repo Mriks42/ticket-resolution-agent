@@ -87,6 +87,50 @@ def test_search_past_tickets_is_only_expected_where_history_exists(
         assert customers[ticket.customer_id].past_tickets
 
 
+def test_requester_identity_is_structural(tickets: list[Ticket]) -> None:
+    """T-013's escalate must not depend on reading intent out of the prose."""
+    customers = load_customers()
+    mismatched = {
+        t.ticket_id
+        for t in tickets
+        if t.requester_email != customers[t.customer_id].owner_email
+    }
+    # T-013 is the colleague-asking case. T-010 is outside counsel writing on
+    # a client's behalf, which is a non-owner too, but its escalate is driven
+    # by DAT-003.5 as well; T-013 is the only one where identity is the sole
+    # trigger.
+    assert mismatched == {"T-010", "T-013"}
+    for tid in mismatched:
+        ticket = next(t for t in tickets if t.ticket_id == tid)
+        assert ticket.labels.outcome is Outcome.ESCALATE
+
+
+def test_loader_rejects_non_owner_request_labeled_resolve(tmp_path) -> None:
+    doctored = tmp_path / "tickets.json"
+    doctored.write_text(
+        json.dumps(
+            [
+                {
+                    "ticket_id": "T-901",
+                    "customer_id": "CUST-1042",
+                    "requester_email": "someone.else@brightfold.example",
+                    "body": "Please cancel the account.",
+                    "labels": {
+                        "outcome": "resolve",
+                        "expected_tools": ["lookup_customer", "send_reply"],
+                        "relevant_policy_ids": ["POL-CAN-001"],
+                        "confidence": "high",
+                        "label_note": None,
+                    },
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="ESC-001.4"):
+        load_tickets(doctored)
+
+
 def test_loader_rejects_search_past_tickets_without_history(tmp_path) -> None:
     """The guard must fail a bad label, not merely pass the current data."""
     doctored = tmp_path / "tickets.json"
@@ -97,6 +141,7 @@ def test_loader_rejects_search_past_tickets_without_history(tmp_path) -> None:
                     "ticket_id": "T-900",
                     # CUST-1042 has no past_tickets in the fixtures.
                     "customer_id": "CUST-1042",
+                    "requester_email": "r.mehta@brightfold.example",
                     "body": "Where are my invoices?",
                     "labels": {
                         "outcome": "resolve",
