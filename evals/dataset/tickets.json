@@ -1,0 +1,266 @@
+[
+  {
+    "ticket_id": "T-001",
+    "customer_id": "CUST-1042",
+    "body": "Hi - I need to get all of our project data out of the product for an internal review next week. Is there a way to download everything at once, and what format does it come in?",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-DAT-002"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-002",
+    "customer_id": "CUST-1108",
+    "body": "Quick question before I put this on the company card: does the Pro plan include API access, or is that Team only? And how much storage do I get on Pro?",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-TIE-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-003",
+    "customer_id": "CUST-1177",
+    "body": "I got an email saying my payment failed. I've been travelling for work and only just saw it. Am I about to lose access to my projects? I can sort the card out at the weekend but not before.",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-PAY-001", "POL-PAY-002"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-004",
+    "customer_id": "CUST-1203",
+    "body": "I was charged $29 on the 18th but I've decided this isn't the right tool for us. Please cancel the subscription and refund that charge.",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "issue_refund", "send_reply"],
+      "relevant_policy_ids": ["POL-REF-001", "POL-CAN-001", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-005",
+    "customer_id": "CUST-1250",
+    "body": "We're onboarding two more engineers on Monday. If I add their seats now, do we get billed straight away or does it wait until our renewal on the 1st? Trying to work out whether to hold off a week.",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-SEA-001", "POL-PRO-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-006",
+    "customer_id": "CUST-1288",
+    "body": "I requested an export a couple of weeks ago and got busy - now the download link says it's expired. Can you generate a new one for me? I'm the account owner.",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-DAT-002"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-007",
+    "customer_id": "CUST-1301",
+    "body": "I'm thinking of dropping back to the free plan now that the contract I bought this for has ended. I've got 12 projects and about 8GB of files in the account. What actually happens to all of that if I downgrade? I don't want to lose the work.",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-PLN-001", "POL-DAT-001", "POL-TIE-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-008",
+    "customer_id": "CUST-1355",
+    "body": "Two people left the team last week and I removed their seats straight away, so we're down to three. This month's invoice hasn't changed at all. Can you credit us for the two seats for the rest of the month?",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-SEA-002", "POL-PRO-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-009",
+    "customer_id": "CUST-1560",
+    "body": "I disputed the August charge with my bank last week because nobody got back to me about it. I'd still like the refund processed on your side as well so this is properly sorted out.",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["lookup_customer", "search_past_tickets", "retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-REF-002", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-010",
+    "customer_id": "CUST-1595",
+    "body": "I am writing on behalf of my client in relation to the account below. My client requires that all personal data held about them be erased under applicable data protection law, within one month of this request. Please confirm in writing once this has been completed.",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-DAT-003", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-011",
+    "customer_id": "CUST-1622",
+    "body": "There are two logins in my audit log from a country I have never been to, and a project was deleted this morning that I definitely did not delete. I've changed my password already. What happened, and can the project be brought back?",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["lookup_customer", "escalate"],
+      "relevant_policy_ids": ["POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-012",
+    "customer_id": "CUST-1650",
+    "body": "We stopped using this back in March and I've just realised we're still paying for it. I want the whole year refunded - that's $1,584 for six seats we haven't touched in months. If that's not possible I'll be speaking to our lawyer about it and I'll be making sure people hear about this on Twitter.",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-CAN-002", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-013",
+    "customer_id": "CUST-1688",
+    "body": "Hi, I work with Dana who originally set up our account - she's on parental leave until November. We don't need the subscription any more. Can you cancel it and refund this month's charge? Happy to give you any details you need.",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-CAN-001", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-014",
+    "customer_id": "CUST-1710",
+    "body": "We're planning to roll this out to around 80 people in Q4. Our procurement team won't put it on a card - they need to pay by purchase order against an annual contract, and legal will want to review terms. Who should I be talking to?",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-SEA-001", "POL-BIL-002"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-015",
+    "customer_id": "CUST-1745",
+    "body": "I've been charged twice for August - invoice INV-88213 on the 2nd and INV-88547 on the 4th, same amount both times. On top of that the billing page is now showing an outstanding balance of $58 which makes no sense to me. Nothing changed on our side, we haven't added anyone.",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["lookup_customer", "search_past_tickets", "retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-BIL-001", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-016",
+    "customer_id": "CUST-1782",
+    "body": "Our annual plan renewed 10 days ago for $1,584 and we absolutely did not mean to let that happen - we'd agreed internally in June to drop it and someone forgot to action it. Nobody has logged in since May. Please refund the renewal and cancel us.",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-REF-001", "POL-CAN-002", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": "Reviewed, escalate confirmed. REF-001.3 (annual renewals refundable within 14 days) and CAN-002.2 (annual non-refundable once the term begins) both cover this renewal at 10 days old, and neither clause declares precedence over the other. Resolving a genuine conflict between two clauses is not within a support agent's authority; the correct behaviour is to surface it. This ticket therefore tests whether the agent notices the contradiction at all, rather than confidently citing whichever clause retrieval happened to return first. The contradiction is left undeclared in the corpus deliberately."
+    }
+  },
+  {
+    "ticket_id": "T-017",
+    "customer_id": "CUST-1420",
+    "body": "I started a trial on 13 July to evaluate this for a project that then got cancelled. I hadn't realised it would roll into a paid annual plan - I was charged $290 on 27 July and only spotted it on my statement today. I've not logged in since the trial. Can I have that refunded please? It's been under 30 days.",
+    "labels": {
+      "outcome": "pending_approval",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "issue_refund"],
+      "relevant_policy_ids": ["POL-TRI-001", "POL-REF-001", "POL-ESC-001"],
+      "confidence": "medium",
+      "label_note": "Reviewed, pending_approval confirmed and confidence raised to medium. A refund window cannot begin before the charge it refunds exists, so REF-001 runs from the charge date of 27 July (28 days ago), placing this inside the REF-001.2 window; $290 is over the $50 ceiling, so ESC-001.2 manager approval applies. The corpus staying silent on trial-to-paid conversion is acceptable and is itself worth testing: the agent should reach the right answer without a clause that spells it out. Held at medium rather than high because the entitlement rests on that reading of when the window starts."
+    }
+  },
+  {
+    "ticket_id": "T-018",
+    "customer_id": "CUST-1455",
+    "body": "We're winding this project down at the end of the month. I'd like to move us straight from Team to the free plan and keep the workspace around read-only so we can refer back to it. There are six of us on the account at the moment. Can you switch us over?",
+    "labels": {
+      "outcome": "escalate",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "escalate"],
+      "relevant_policy_ids": ["POL-PLN-001", "POL-SEA-002", "POL-DAT-001"],
+      "confidence": "high",
+      "label_note": "Reviewed, escalate confirmed. PLN-001 covers Pro->Free (PLN-001.1) and Team->Pro (PLN-001.2) but never Team->Free. The composition reading - chain the two clauses to synthesise the unspecified path - is explicitly rejected: inferring an unwritten path from two adjacent clauses is exactly the kind of confident inference the agent must not make. POL-PLN-001 is deliberately left unamended, because the gap is the test."
+    }
+  },
+  {
+    "ticket_id": "T-019",
+    "customer_id": "CUST-1490",
+    "body": "My card got declined and I know I'm into the grace period now. I get paid on the 5th and I can settle it then. Can you give me an extra week before you lock the account? Losing access mid-project would really hurt us.",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-PAY-001", "POL-PAY-002"],
+      "confidence": "high",
+      "label_note": "Reviewed, flipped from escalate to resolve - decline politely. PAY-001.5 enumerates the grace extension as a Team permission, and Pro is not in that enumeration, so the answer is a clear no. ESC-001.6 covers situations the corpus does not address; an enumerated permission that excludes this plan is addressed. The agent should decline and point the customer at PAY-001.3/PAY-002.2 for what happens next and how to restore access."
+    }
+  },
+  {
+    "ticket_id": "T-020",
+    "customer_id": "CUST-1520",
+    "body": "We waited three days for a reply on a production problem last week, on a plan that's sold with a four hour response target. This is the second time this quarter. I want the month credited back - that's $132 for our six seats.",
+    "labels": {
+      "outcome": "resolve",
+      "expected_tools": ["lookup_customer", "search_past_tickets", "retrieve_policy", "send_reply"],
+      "relevant_policy_ids": ["POL-SLA-001"],
+      "confidence": "high",
+      "label_note": "Reviewed, flipped from pending_approval to resolve - decline. SLA-001.5 states flatly that no service credits are issued for a missed response target. If an explicit prohibition still routes to approval because a goodwill route exists elsewhere in the corpus, then no policy is ever dispositive and pending_approval stops carrying meaning. The value of this ticket is testing whether the agent holds a policy under pressure from a customer with a genuine, verifiable complaint - the past-ticket history confirms both slow responses, and the answer is still no."
+    }
+  },
+  {
+    "ticket_id": "T-021",
+    "customer_id": "CUST-1834",
+    "body": "We've decided not to continue with this after the pilot. Our monthly charge of $176 for the eight seats went through on 13 August and I'd like that refunded and the account closed, please. Nobody has been in the account since the pilot wrapped up at the end of July.",
+    "labels": {
+      "outcome": "pending_approval",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "issue_refund"],
+      "relevant_policy_ids": ["POL-REF-001", "POL-CAN-001", "POL-ESC-001"],
+      "confidence": "high",
+      "label_note": null
+    }
+  },
+  {
+    "ticket_id": "T-022",
+    "customer_id": "CUST-1867",
+    "body": "hi so this is probably partly our fault. we were meant to cancel before the renewal, my colleague had it on his list and then he was off sick and it just didnt happen. so we got billed again on the 18th, full whack for all twelve seats, 264. nobody has touched the account since july i checked the logs myself. can we get that back? happy to close it out properly this time just tell me what you need. also seperately is there a way to pull down what we did have in there before it all goes, not urgent but would be good to have",
+    "labels": {
+      "outcome": "pending_approval",
+      "expected_tools": ["lookup_customer", "retrieve_policy", "issue_refund"],
+      "relevant_policy_ids": ["POL-REF-001", "POL-CAN-001", "POL-ESC-001", "POL-DAT-002"],
+      "confidence": "high",
+      "label_note": null
+    }
+  }
+]

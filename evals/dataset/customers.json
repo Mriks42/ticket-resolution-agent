@@ -1,0 +1,255 @@
+{
+  "CUST-1042": {
+    "customer_id": "CUST-1042",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-04",
+    "past_tickets": []
+  },
+  "CUST-1108": {
+    "customer_id": "CUST-1108",
+    "plan": "free",
+    "seats": 1,
+    "billing_cycle": null,
+    "account_status": "active",
+    "last_charge_usd": null,
+    "last_charge_date": null,
+    "past_tickets": []
+  },
+  "CUST-1177": {
+    "customer_id": "CUST-1177",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "dunning",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-15",
+    "past_tickets": []
+  },
+  "CUST-1203": {
+    "customer_id": "CUST-1203",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-18",
+    "past_tickets": []
+  },
+  "CUST-1250": {
+    "customer_id": "CUST-1250",
+    "plan": "team",
+    "seats": 5,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 110.0,
+    "last_charge_date": "2026-08-01",
+    "past_tickets": []
+  },
+  "CUST-1288": {
+    "customer_id": "CUST-1288",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-06",
+    "past_tickets": []
+  },
+  "CUST-1301": {
+    "customer_id": "CUST-1301",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-09",
+    "past_tickets": []
+  },
+  "CUST-1355": {
+    "customer_id": "CUST-1355",
+    "plan": "team",
+    "seats": 3,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 110.0,
+    "last_charge_date": "2026-08-12",
+    "past_tickets": []
+  },
+  "CUST-1420": {
+    "customer_id": "CUST-1420",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "annual",
+    "account_status": "active",
+    "last_charge_usd": 290.0,
+    "last_charge_date": "2026-07-27",
+    "past_tickets": []
+  },
+  "CUST-1455": {
+    "customer_id": "CUST-1455",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 132.0,
+    "last_charge_date": "2026-08-01",
+    "past_tickets": []
+  },
+  "CUST-1490": {
+    "customer_id": "CUST-1490",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "grace",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-07-10",
+    "past_tickets": []
+  },
+  "CUST-1520": {
+    "customer_id": "CUST-1520",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 132.0,
+    "last_charge_date": "2026-08-03",
+    "past_tickets": [
+      {
+        "ticket_id": "H-4471",
+        "opened": "2026-06-09",
+        "summary": "Reported that a scheduled job stopped firing in production; asked for urgent help.",
+        "resolution": "Resolved after 2 days 4 hours. First response was 51 hours after the ticket was opened, against a 4 business hour target."
+      },
+      {
+        "ticket_id": "H-5088",
+        "opened": "2026-08-11",
+        "summary": "Reported a production outage affecting their shared workspace.",
+        "resolution": "Resolved after 3 days 6 hours. First response was 71 hours after the ticket was opened, against a 4 business hour target. Customer noted this was the second slow response."
+      }
+    ]
+  },
+  "CUST-1560": {
+    "customer_id": "CUST-1560",
+    "plan": "team",
+    "seats": 4,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 88.0,
+    "last_charge_date": "2026-08-02",
+    "past_tickets": [
+      {
+        "ticket_id": "H-5012",
+        "opened": "2026-08-05",
+        "summary": "Queried the 2 August charge of $88, said they did not recognise it and asked for it to be explained or refunded.",
+        "resolution": "Closed with no reply sent to the customer. No agent picked the ticket up."
+      },
+      {
+        "ticket_id": "H-5039",
+        "opened": "2026-08-12",
+        "summary": "Chased for an update on H-5012 and said they would go to their bank if they did not hear back.",
+        "resolution": "Closed as a duplicate of H-5012. No reply sent."
+      }
+    ]
+  },
+  "CUST-1595": {
+    "customer_id": "CUST-1595",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-07",
+    "past_tickets": []
+  },
+  "CUST-1622": {
+    "customer_id": "CUST-1622",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 132.0,
+    "last_charge_date": "2026-08-05",
+    "past_tickets": []
+  },
+  "CUST-1650": {
+    "customer_id": "CUST-1650",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "annual",
+    "account_status": "active",
+    "last_charge_usd": 1584.0,
+    "last_charge_date": "2025-11-20",
+    "past_tickets": []
+  },
+  "CUST-1688": {
+    "customer_id": "CUST-1688",
+    "plan": "team",
+    "seats": 4,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 88.0,
+    "last_charge_date": "2026-08-10",
+    "past_tickets": []
+  },
+  "CUST-1710": {
+    "customer_id": "CUST-1710",
+    "plan": "team",
+    "seats": 5,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 110.0,
+    "last_charge_date": "2026-08-08",
+    "past_tickets": []
+  },
+  "CUST-1745": {
+    "customer_id": "CUST-1745",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 132.0,
+    "last_charge_date": "2026-08-04",
+    "past_tickets": [
+      {
+        "ticket_id": "H-4623",
+        "opened": "2026-06-30",
+        "summary": "Reported an unexplained $58 line item on invoice INV-84102 that did not correspond to any seat change.",
+        "resolution": "Closed as 'billing system correction pending'. No correction was ever applied and the customer was not followed up with."
+      }
+    ]
+  },
+  "CUST-1782": {
+    "customer_id": "CUST-1782",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "annual",
+    "account_status": "active",
+    "last_charge_usd": 1584.0,
+    "last_charge_date": "2026-08-14",
+    "past_tickets": []
+  },
+  "CUST-1834": {
+    "customer_id": "CUST-1834",
+    "plan": "team",
+    "seats": 8,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 176.0,
+    "last_charge_date": "2026-08-13",
+    "past_tickets": []
+  },
+  "CUST-1867": {
+    "customer_id": "CUST-1867",
+    "plan": "team",
+    "seats": 12,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 264.0,
+    "last_charge_date": "2026-08-18",
+    "past_tickets": []
+  }
+}

@@ -3,3 +3,6 @@ __pycache__/
 .env
 *.pyc
 mlruns/
+
+# Generated eval reports. evals/report/.gitkeep preserves the directory.
+evals/report/*.json
