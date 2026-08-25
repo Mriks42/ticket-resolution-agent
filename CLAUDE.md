@@ -70,7 +70,10 @@ Exceeding any budget routes to ESCALATE, never to a silent failure.
 Read-only, agent calls freely:
 - `lookup_customer(customer_id)`
 - `search_past_tickets(query, customer_id=None)`
-- `retrieve_policy(query)` — returns passages with source IDs
+- `retrieve_policy(query)` — returns passages with clause-level source IDs
+  (e.g. `REF-001.3`), not document-level (`POL-REF-001`). The Session 6
+  guardrail checks each policy claim against the specific passage that
+  supports it, which a document-level ID is too coarse to do.
 
 Write / gated, require HITL approval based on deterministic rules — action
 type (e.g. any refund over a threshold amount, any reply making a policy
@@ -109,7 +112,7 @@ ESCALATE.
 
 `evals/` is the center of this project, not an afterthought.
 
-Dataset: 20 hand-written, hand-labeled tickets as a permanent held-out sanity
+Dataset: 22 hand-written, hand-labeled tickets as a permanent held-out sanity
 check, expanded synthetically to 150+ for the full eval set. Labels are
 drafted by the assistant, then reviewed and corrected before entering the
 set — never auto-accepted. Each label carries the correct outcome (resolve,
@@ -133,8 +136,10 @@ Metrics, all produced by `evals/run.py`:
 - **p50 / p95 latency per resolved ticket**
 
 Report metrics with bootstrap confidence intervals, not bare point estimates.
-The eval set is small; a 3-point difference on 180 tickets is probably noise
-and the report should make that visible.
+The eval set is small: at the current 22 tickets a 95% CI on a rate spans
+roughly ±20 points, so any agent-to-agent difference smaller than that is
+unproven rather than a small win. The report must make that visible rather
+than inviting readers to interpret noise.
 
 Required ablations:
 1. memory on vs. off
