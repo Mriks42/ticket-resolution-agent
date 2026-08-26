@@ -26,6 +26,18 @@ a number produced by the eval harness.
 - **Small diffs.** One concern per change. Stop and report rather than
   continuing into adjacent work I didn't ask for.
 
+## Session order
+
+**Retrieval comes before the agent loop.** Session 3 measured the lexical
+retriever and found POL-ESC-001 — the document deciding resolve vs.
+pending_approval — retrieved on 1 of the 11 tickets that need it at the default
+`limit=5`, and ranked 28th, 36th and 75th on the three `pending_approval`
+tickets. A loop built on that would be tuned against retrieval failure rather
+than agent behaviour. So retrieval (pgvector) is session 4, and the agent loop,
+HITL gate and guardrail each move one session later. Do not build the loop
+against lexical retrieval. See `docs/adr/0003-retrieval-approach.md`, which
+also records what pgvector is *not* expected to fix.
+
 ## Stack
 
 - Python 3.11, `uv` for dependency management
