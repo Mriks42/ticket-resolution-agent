@@ -6,3 +6,7 @@ mlruns/
 
 # Generated eval reports. evals/report/.gitkeep preserves the directory.
 evals/report/*.json
+
+# Runtime artifacts: the write-tool store and the audit log. Overridable per
+# run via TRA_VAR_DIR, so eval runs and tests write elsewhere. See src/paths.py.
+var/
