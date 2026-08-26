@@ -11,6 +11,7 @@ import json
 
 import pytest
 
+from evals.loader import load_tickets
 from src.tools.catalog import CATALOG, Scope
 from src.tools.context import ToolContext
 from src.tools.errors import ToolInputError
@@ -164,6 +165,23 @@ def test_retrieve_policy_surfaces_both_sides_of_the_planted_conflict(
         query="annual subscription refund after renewal term begun",
         limit=12,
     )
+    found = {p["clause_id"] for p in result["passages"]}
+    assert {"REF-001.3", "CAN-002.2"} <= found
+
+
+def test_default_limit_reaches_both_sides_of_the_conflict_for_t016(
+    ctx: ToolContext,
+) -> None:
+    """The default `limit` must not hide the contradiction T-016 tests for.
+
+    Against T-016's real body, REF-001.3 ranks 1st and CAN-002.2 ranks 6th, so
+    the old default of 5 returned one side and looked confident about it. This
+    pins the default high enough to surface both, using the ticket text rather
+    than a paraphrase -- testing a paraphrase is what produced the wrong
+    diagnosis in the first place. See ADR 0003.
+    """
+    t016 = next(t for t in load_tickets() if t.ticket_id == "T-016")
+    result = call(ctx, "retrieve_policy", query=t016.body)
     found = {p["clause_id"] for p in result["passages"]}
     assert {"REF-001.3", "CAN-002.2"} <= found
 

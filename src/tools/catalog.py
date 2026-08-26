@@ -27,7 +27,11 @@ from typing import Any
 from src.tools.context import ToolContext
 from src.tools.errors import ToolInputError
 
-DEFAULT_RETRIEVAL_LIMIT = 5
+#: Chosen from the recall sweep in `evals/retrieval_baseline.py`, not picked as
+#: a round number. Recall rises in two steps, at k=8 and k=10, then goes flat:
+#: 0.716 at k=10 against 0.727 at both k=12 and k=15. 10 is the knee — the last
+#: k that buys anything before diminishing returns. See ADR 0003.
+DEFAULT_RETRIEVAL_LIMIT = 10
 
 
 class Scope(str, Enum):

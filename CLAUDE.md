@@ -29,14 +29,19 @@ a number produced by the eval harness.
 ## Session order
 
 **Retrieval comes before the agent loop.** Session 3 measured the lexical
-retriever and found POL-ESC-001 — the document deciding resolve vs.
-pending_approval — retrieved on 1 of the 11 tickets that need it at the default
-`limit=5`, and ranked 28th, 36th and 75th on the three `pending_approval`
-tickets. A loop built on that would be tuned against retrieval failure rather
-than agent behaviour. So retrieval (pgvector) is session 4, and the agent loop,
-HITL gate and guardrail each move one session later. Do not build the loop
-against lexical retrieval. See `docs/adr/0003-retrieval-approach.md`, which
-also records what pgvector is *not* expected to fix.
+retriever (`python -m evals.retrieval_baseline`) and found mean recall of the
+relevant policy documents at 0.716, with POL-ESC-001 — the document deciding
+resolve vs. pending_approval — retrieved on only 3 of the 11 tickets that need
+it, and ranked 28th, 36th and 75th on the three `pending_approval` tickets. A
+loop built on that would be tuned against retrieval failure rather than agent
+behaviour. So retrieval (pgvector) is session 4, and the agent loop, HITL gate
+and guardrail each move one session later. Do not build the loop against
+lexical retrieval.
+
+See `docs/adr/0003-retrieval-approach.md` for what pgvector is *not* expected
+to fix — in particular that ESC-001's approval bands are the action-type half
+of the deterministic gating rule, decided by arithmetic in the gate, and are
+not a retrieval target to optimise.
 
 ## Stack
 
@@ -211,6 +216,7 @@ evals/
   dataset/     labeled tickets
   generate/    synthetic generator, if used
   run.py       produces every number in the README
+  retrieval_baseline.py   recall@k for retrieve_policy, no agent loop needed
   report/      output metrics + CIs
 infra/         terraform
 tests/

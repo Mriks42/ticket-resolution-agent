@@ -17,47 +17,60 @@ ahead of the agent loop in the session order.
 
 ### How these numbers were produced
 
-`evals/loader.load_tickets()` for the 22 labeled tickets,
-`src.tools.policy.load_policy_index()` for the 104-clause corpus. Each ticket's
-`body` is used verbatim as the query; retrieved clause IDs are rolled up to
-their `policy_id` and compared against that ticket's `relevant_policy_ids`.
-Document-level rollup is necessary because the labels are document-level
-(`POL-REF-001`) while retrieval is clause-level (`REF-001.3`).
+```
+python -m evals.retrieval_baseline
+```
 
-**These numbers are not yet reproducible from a committed script.** Landing one
-in `evals/` is the first task of the retrieval session; until then, treat every
-figure below as provisional and re-derive it before quoting it anywhere. No
-figure here belongs in the README.
+Each ticket's `body` verbatim as the query against the 104-clause corpus;
+retrieved clause IDs rolled up to their `policy_id` and compared against that
+ticket's `relevant_policy_ids`. The rollup is necessary because labels are
+document-level (`POL-REF-001`) while retrieval is clause-level (`REF-001.3`),
+and it flatters the retriever slightly: returning any clause of a document
+counts as retrieving it, even the wrong clause.
 
 ### What the measurement found
 
-Recall of the labeled-relevant policy documents, ticket body as query:
+Recall of the labeled-relevant policy documents, ticket body as query, with the
+context each k costs:
 
-| k | mean recall | tickets where every relevant doc was retrieved |
-|---|---|---|
-| 5 | 0.530 | 5 / 22 |
-| 10 | 0.716 | 10 / 22 |
-| 20 | 0.822 | 13 / 22 |
+| k | mean recall | tickets with all relevant docs | ESC-001 retrieved | chars | ~tokens |
+|---|---|---|---|---|---|
+| 3 | 0.500 | 5/22 | 1/11 | 280 | 70 |
+| 5 | 0.530 | 5/22 | 1/11 | 481 | 120 |
+| 7 | 0.561 | 5/22 | 1/11 | 673 | 168 |
+| 8 | 0.652 | 8/22 | 2/11 | 793 | 198 |
+| 10 | 0.716 | 10/22 | 3/11 | 994 | 249 |
+| 12 | 0.727 | 10/22 | 3/11 | 1206 | 302 |
+| 15 | 0.727 | 10/22 | 3/11 | 1527 | 382 |
+| 20 | 0.822 | 13/22 | 4/11 | 2036 | 509 |
 
-The default `limit` is 5, so the operative row is the first one: on average the
-agent would see about half the policy it needs, and on 17 of 22 tickets it
-would be missing at least one relevant document.
+At the `limit=5` this shipped with, the agent would on average see about half
+the policy it needs, and on 17 of 22 tickets would be missing at least one
+relevant document.
 
-### Correction: T-016 is a cutoff problem, not a reachability problem
+### Correction: the original T-016 finding was wrong
 
 The session 3 report claimed the planted REF-001.3 / CAN-002.2 conflict was
-unreachable from realistic phrasing. That was based on a paraphrase written by
-hand, not on the ticket. Against T-016's actual body:
+unreachable from realistic phrasing. **That was wrong, and it is recorded here
+rather than quietly fixed, because the reordering below was originally
+justified by it.** The claim came from testing a paraphrase written by hand —
+*"annual auto renewed 10 days ago want money back"* — instead of the ticket.
+Against T-016's actual body:
 
 ```
 REF-001.3  rank 1
 CAN-002.2  rank 6
 ```
 
-Both sides are reachable; CAN-002.2 simply falls outside the default `limit=5`.
-Raising the default to 10 would make T-016's conflict visible today, with no
-change of retrieval backend. The original diagnosis was wrong and the fix it
-implied was wrong with it.
+Both sides are reachable. CAN-002.2 was simply falling outside `limit=5`. The
+lesson generalises past this one case: a retriever must be evaluated on the
+corpus's real queries, which is now what `evals/retrieval_baseline.py` does and
+what the regression test in `tests/test_tools.py` pins.
+
+This is a real finding in its own right, and a cheaper one than a new backend —
+see the decision on the default limit below. It is not, however, a reason to
+leave retrieval as it is; the measurement that corrected it also surfaced a
+larger problem.
 
 ### The actual dominant failure: POL-ESC-001 is not retrieved
 
@@ -71,10 +84,11 @@ ticket is `resolve` or `pending_approval`. It is retrieved on:
 | 10 | 3 / 11 |
 | 20 | 4 / 11 |
 
-For the three `pending_approval` tickets, the first ESC-001 clause ranks:
+For the three `pending_approval` tickets, the first ESC-001 clause ranks (out
+of the clauses scoring above zero at all, so "last" is checkable):
 
 ```
-T-017   rank 75 of 75   (last)
+T-017   rank 75 of 75   (last scoring clause)
 T-021   rank 36 of 73
 T-022   rank 28 of 71
 ```
@@ -107,11 +121,11 @@ fixes:
 ## Options considered
 
 **Keep lexical, raise the default `limit`.** Cheapest thing that works, and it
-does fix T-016. It moves mean recall from 0.530 to 0.716 at k=10 — still one in
-three relevant documents unseen, and it does nothing for class (B): ESC-001
-goes from 1/11 to 3/11. It also enlarges every prompt, and a larger k with a
-weak ranker means more irrelevant passages the guardrail must reason around.
-Not sufficient on its own, but worth doing regardless.
+does fix T-016. It moves mean recall from 0.530 to 0.716 — still one in three
+relevant documents unseen, and it barely touches class (B): ESC-001 goes from
+1/11 to 3/11. It also enlarges every prompt, and a larger k with a weak ranker
+means more irrelevant passages the guardrail must reason around. Not sufficient
+on its own, but strictly worth doing, and adopted below.
 
 **Embedding retrieval over pgvector.** Already in the stack per CLAUDE.md, so
 no new dependency argument to make. Directly targets class (A). Does nothing
@@ -126,27 +140,78 @@ measured recall rather than asserted here.
 
 1. **Retrieval moves ahead of the agent loop in the session order.** This is
    an empirical decision, not a preference. With ESC-001 retrieved on 1 of 11
-   tickets at the default k, an agent loop built now would be tuned against a
-   signal dominated by retrieval failure — and the tuning would silently bake
-   that in.
-2. **Adopt embedding-based retrieval over pgvector** as the primary backend
+   tickets at the shipped default, an agent loop built now would be tuned
+   against a signal dominated by retrieval failure — and the tuning would
+   silently bake that in.
+
+2. **Raise the default `limit` from 5 to 10, now.** Chosen off the sweep
+   rather than as a round number. Recall climbs in two steps — k=8 (+0.091,
+   and three more tickets reach full recall) and k=10 (+0.064, two more) —
+   and then goes flat: 0.716 at k=10 against 0.727 at *both* k=12 and k=15.
+   k=10 is the knee, the last value that buys anything before diminishing
+   returns.
+
+   **What it buys:** mean recall 0.530 → 0.716; tickets with every relevant
+   document retrieved 5/22 → 10/22; T-016's conflict becomes visible, since
+   CAN-002.2 at rank 6 now falls inside the window.
+
+   **What it costs:** mean returned passage text goes from 481 to 994
+   characters per ticket, roughly 120 to 250 tokens. That is a real but small
+   addition to a per-ticket prompt, and it is the cheaper half of the trade —
+   the more material cost is that a weak ranker at k=10 puts more irrelevant
+   passages in front of the guardrail, which has to keep refusing to cite
+   them. If hallucinated-policy rate rises when the loop lands, this is the
+   first thing to re-examine.
+
+   k=20 would reach 0.822, but it doubles context again for a ranker we are
+   about to replace, so it is not worth buying twice.
+
+3. **Adopt embedding-based retrieval over pgvector** as the primary backend
    for `retrieve_policy`.
-3. **Keep the lexical index.** It is the baseline the new backend has to beat,
+
+4. **Keep the lexical index.** It is the baseline the new backend has to beat,
    and this project does not get to claim an improvement it has not measured.
    `src/tools/lexical.py` stays, selectable by config.
-4. **Land a retrieval-only eval first**, before changing the backend. Recall@k
-   against `relevant_policy_ids` needs no agent loop, no LLM, and no cost — the
-   table above is already computable. It becomes the regression check for
-   every subsequent retrieval change, and it produces the committed script the
-   numbers in this ADR currently lack.
-5. **Add retrieval backend as an ablation axis** (lexical / dense / hybrid),
+
+5. **`evals/retrieval_baseline.py` is the regression check.** Recall@k against
+   `relevant_policy_ids` needs no agent loop, no LLM and no cost, so it runs on
+   every retrieval change. It produces every number in this ADR.
+
+6. **Add retrieval backend as an ablation axis** (lexical / dense / hybrid),
    alongside the three ablations CLAUDE.md already requires.
-6. **Track class (B) separately.** It is not a retrieval-backend problem and
-   shipping pgvector will not close it. Candidate mechanisms — a deterministic
-   amount-to-threshold rule feeding the HITL gate, or the agent issuing a
-   second targeted policy query once it knows the amount — belong to the gate
-   session, not this one. What matters is that it is not mistaken for
-   something dense retrieval will fix.
+
+### Class (B) is a gating rule, not a retrieval target
+
+Splitting this out because it is the thing most likely to be mistaken for a
+retrieval bug and chased with a better index.
+
+CLAUDE.md already specifies HITL gating as deterministic, on **action type**
+combined with **retrieval coverage**. The approval bands in ESC-001.1–.3 are
+the *action-type* half of that rule. "Refund of $176" falls in the
+50.01–500 band and therefore requires manager approval — that is a comparison
+against a number the agent already holds, decided in code, before any passage
+is retrieved.
+
+So ESC-001's thresholds are **not** something `retrieve_policy` is expected to
+supply, and the 3/11 figure above is not a target to optimise. Retrieval's job
+for these tickets is the *coverage* half — did the reply's claims land on
+passages actually retrieved — and that is a different question from whether the
+gate fires.
+
+Two consequences follow:
+
+- Session 6 must not treat the ESC-001 recall number as a retrieval defect to
+  fix. Implementing the band comparison in the gate is the fix. A dense index
+  that happened to raise 3/11 to 8/11 would be measuring nothing useful, since
+  the gate would not be consulting those passages to decide.
+- The gate still needs the clause text to *explain* itself in the reply, and
+  citing ESC-001.2 requires having retrieved ESC-001.2. So the agent should
+  issue a targeted policy query once the amount is known, rather than hoping
+  the ticket body reaches the clause. That is a loop-design point, and it
+  belongs to the session that builds the gate.
+
+This keeps the two halves of the gating rule in their proper places: the
+threshold is arithmetic, and retrieval is evidence.
 
 ## Consequences
 
@@ -165,7 +230,8 @@ retrieval eval rather than assumed:
 
 - **Numeric bands (class B).** Embeddings are weak at magnitude comparison;
   `$176` and `$1,584` embed similarly while falling in different approval
-  bands. Expect no improvement on ESC-001, and verify rather than hope.
+  bands. Expect no improvement on ESC-001 — and per "Class (B) is a gating
+  rule" above, do not chase one. The band comparison belongs in the gate.
 - **Negation.** "refundable" and "non-refundable" are close in embedding
   space. That may help surface both sides of the REF-001.3 / CAN-002.2
   conflict, and equally may make the agent unable to tell which one it is
@@ -190,9 +256,21 @@ retrieval eval rather than assumed:
   is free and sub-millisecond; that will no longer be true, and the budget
   numbers in CLAUDE.md were not set with it in mind.
 
+### What changed under this ADR
+
+Applied now, with the ADR:
+
+- `DEFAULT_RETRIEVAL_LIMIT` 5 → 10 in `src/tools/catalog.py`, per decision 2.
+- `evals/retrieval_baseline.py`, which produces every number above.
+- A regression test pinning that T-016's conflict is reachable at the default
+  limit, queried with the ticket's real body.
+
+Deferred to the retrieval session: the pgvector backend itself, the similarity
+floor, and the backend ablation axis.
+
 ### On the session order itself
 
 The agent loop, the HITL gate and the guardrail all shift one session later.
-Nothing in session 3's tool or MCP layer changes: `retrieve_policy` keeps its
+The tool and MCP layer is otherwise untouched: `retrieve_policy` keeps its
 signature and its clause-level IDs, and the backend swap happens behind
 `src/tools/policy.py`. The catalog, the scopes and the audit log are unaffected.
