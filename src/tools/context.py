@@ -7,6 +7,7 @@ from pathlib import Path
 
 from src.paths import resolve_var_dir
 from src.tools.fixtures import FixtureBackend
+from src.tools.retrieval import RetrievalConfig
 from src.tools.store import WriteStore
 
 
@@ -22,10 +23,11 @@ class ToolContext:
         *,
         var_dir: str | Path | None = None,
         dataset_dir: str | Path | None = None,
+        retrieval: RetrievalConfig | None = None,
     ) -> ToolContext:
         resolved = resolve_var_dir(var_dir)
         return cls(
-            fixtures=FixtureBackend(dataset_dir),
+            fixtures=FixtureBackend(dataset_dir, retrieval),
             store=WriteStore(resolved),
             var_dir=resolved,
         )

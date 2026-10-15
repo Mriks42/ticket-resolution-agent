@@ -129,16 +129,24 @@ def load_clauses(policy_dir: Path = DEFAULT_POLICY_DIR) -> list[Clause]:
     return clauses
 
 
+def indexed_text(clause: Clause) -> str:
+    """What a backend indexes for a clause. Shared so backends are compared on
+    identical input rather than on what each happened to be fed.
+
+    The title rides along with the clause text so a query naming the subject
+    ("refund window") can reach a clause that never repeats it.
+    """
+    return f"{clause.title} {clause.text}"
+
+
 class PolicyIndex:
-    """Clause-level retrieval over the corpus."""
+    """Clause-level retrieval over the corpus, lexical TF-IDF."""
+
+    backend = "lexical"
 
     def __init__(self, clauses: list[Clause]) -> None:
         self._clauses = {c.clause_id: c for c in clauses}
-        # The title is indexed alongside the clause text so a query naming the
-        # subject ("refund window") can reach a clause that never repeats it.
-        self._index = LexicalIndex(
-            {c.clause_id: f"{c.title} {c.text}" for c in clauses}
-        )
+        self._index = LexicalIndex({c.clause_id: indexed_text(c) for c in clauses})
 
     def search(self, query: str, limit: int = 5) -> list[tuple[Clause, float]]:
         return [

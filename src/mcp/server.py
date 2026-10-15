@@ -27,6 +27,7 @@ import time
 from pathlib import Path
 from typing import Any, IO
 
+from src.config import load_dotenv
 from src.mcp.audit import AuditLog
 from src.tools.catalog import CATALOG, Scope
 from src.tools.context import ToolContext
@@ -270,6 +271,7 @@ def main(argv: list[str] | None = None) -> int:
         help="Override where the store and audit log are written.",
     )
     args = parser.parse_args(argv)
+    load_dotenv()
 
     if args.scopes.strip() == "all":
         granted = frozenset(Scope)

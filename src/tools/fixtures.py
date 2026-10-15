@@ -24,16 +24,23 @@ from evals.loader import load_customers
 from src.paths import DEFAULT_DATASET_DIR
 from src.tools.errors import ToolInputError
 from src.tools.lexical import LexicalIndex
-from src.tools.policy import PolicyIndex, load_policy_index
+from src.tools.retrieval import PolicySearch, RetrievalConfig, build_policy_index
 
 
 class FixtureBackend:
-    """Read-only access to the customer records and the policy corpus."""
+    """Read-only access to the customer records and the policy corpus.
 
-    def __init__(self, dataset_dir: Path | None = None) -> None:
+    `retrieval` picks the policy backend; `None` reads it from the environment.
+    """
+
+    def __init__(
+        self,
+        dataset_dir: Path | None = None,
+        retrieval: RetrievalConfig | None = None,
+    ) -> None:
         self.dataset_dir = Path(dataset_dir or DEFAULT_DATASET_DIR)
         self._customers = load_customers(self.dataset_dir / "customers.json")
-        self._policy = load_policy_index(self.dataset_dir / "policies")
+        self._policy = build_policy_index(self.dataset_dir / "policies", retrieval)
 
         # Past contacts are indexed once, keyed "CUST-1520/H-4471" so a search
         # can be filtered by customer without rebuilding the index.
@@ -46,7 +53,7 @@ class FixtureBackend:
         )
 
     @property
-    def policy(self) -> PolicyIndex:
+    def policy(self) -> PolicySearch:
         return self._policy
 
     def customer(self, customer_id: str) -> dict:

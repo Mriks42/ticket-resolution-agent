@@ -16,13 +16,18 @@ from src.tools.catalog import CATALOG, Scope
 from src.tools.context import ToolContext
 from src.tools.errors import ToolInputError
 from src.tools.policy import load_clauses
+from src.tools.retrieval import RetrievalConfig
 from src.tools.store import WriteStore
 
 
 @pytest.fixture
 def ctx(tmp_path) -> ToolContext:
-    """A context whose writes land in an isolated var dir."""
-    return ToolContext.build(var_dir=tmp_path / "var")
+    """A context whose writes land in an isolated var dir.
+
+    Pinned to the lexical backend: the retrieval assertions below are about
+    lexical behaviour, and must not change with a developer's environment.
+    """
+    return ToolContext.build(var_dir=tmp_path / "var", retrieval=RetrievalConfig())
 
 
 def call(ctx: ToolContext, tool: str, **args):
