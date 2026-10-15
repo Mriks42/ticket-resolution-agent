@@ -3,6 +3,11 @@
 `api` is a scripted HTTP server on a loopback port, for testing provider
 clients against the bytes they really send and receive.
 
+`ctx`, `server`, `writer`, `trace` and `make` are the agent-loop rig: real
+tools on the lexical backend in an isolated var dir, a read-only server for the
+model's calls and a write-scoped one only the gate reaches, sharing one store
+and one audit log.
+
 `pg` gives a test its own Postgres schema, dropped afterwards, so tests never
 read or write the tables a dev run or an eval run uses. Tests that need it are
 skipped, with the reason shown, when Postgres is not reachable — they need
@@ -23,7 +28,14 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
+from src.agent.config import AgentConfig
+from src.agent.executor import MCPToolExecutor
+from src.agent.loop import READ_SCOPES, WRITE_SCOPES, AgentLoop
+from src.agent.trace import TraceLog
 from src.config import read_dotenv
+from src.mcp.server import MCPServer
+from src.tools.context import ToolContext
+from src.tools.retrieval import RetrievalConfig
 
 
 @pytest.fixture
@@ -157,3 +169,42 @@ def api():
     server.start()
     yield server
     server.stop()
+
+
+# --- agent loop rig ----------------------------------------------------------
+
+
+@pytest.fixture
+def ctx(tmp_path) -> ToolContext:
+    return ToolContext.build(var_dir=tmp_path / "var", retrieval=RetrievalConfig())
+
+
+@pytest.fixture
+def server(ctx, tmp_path) -> MCPServer:
+    return MCPServer(granted_scopes=READ_SCOPES, context=ctx, var_dir=tmp_path / "var")
+
+
+@pytest.fixture
+def writer(ctx, tmp_path) -> MCPServer:
+    return MCPServer(granted_scopes=WRITE_SCOPES, context=ctx, var_dir=tmp_path / "var")
+
+
+@pytest.fixture
+def trace(tmp_path) -> TraceLog:
+    return TraceLog(tmp_path / "var" / "trace" / "trace.jsonl")
+
+
+@pytest.fixture
+def make(server, writer, trace):
+    def build(llm, *, executor=None, write_executor=None, clock=time.monotonic, spend=None, **config):
+        return AgentLoop(
+            llm=llm,
+            executor=executor or MCPToolExecutor(server, timeout=5),
+            writer=write_executor or MCPToolExecutor(writer, timeout=5),
+            trace=trace,
+            config=AgentConfig(**config),
+            clock=clock,
+            spend=spend,
+        )
+
+    return build

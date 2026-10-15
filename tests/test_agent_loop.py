@@ -2,7 +2,9 @@
 
 The LLM is the only fake. Tools run through the real `MCPServer` over the real
 fixtures (lexical backend, isolated var dir), so scopes, the audit log and the
-tool handlers are exercised as they will be in an eval. A scripted LLM is what
+tool handlers are exercised as they will be in an eval. The rig (`conftest`)
+gives the loop a read-only server and, separately, a write-scoped one that only
+the gate dispatches to. Gate behaviour itself is in `test_gate_loop.py`. A scripted LLM is what
 makes each CLAUDE.md failure case reachable on demand, deterministically and
 for $0; whether the *real* model behaves well is the eval's question, not
 these tests'.
@@ -15,103 +17,25 @@ from __future__ import annotations
 
 import asyncio
 import json
-import time
-from itertools import count
 
 import pytest
 
 from evals.loader import load_tickets
 from evals.run import run_agent
 from evals.schema import Outcome, Ticket, TicketLabels
-from src.agent.config import AgentConfig
 from src.agent.executor import MCPToolExecutor
-from src.agent.llm import Completion, LLMError, ToolCallRequest, ToolResult, Usage
-from src.agent.loop import READ_SCOPES, AgentLoop
+from src.agent.llm import LLMError, ToolResult, Usage
+from src.agent.loop import READ_SCOPES, WRITE_SCOPES
 from src.agent.pricing import Price, SpendCapExceeded, SpendGuard
 from src.agent.states import ALLOWED, State
-from src.agent.trace import TraceLog
 from src.httpjson import RetryPolicy
-from src.mcp.server import MCPServer
 from src.tools.catalog import CATALOG, Scope
-from src.tools.context import ToolContext
-from src.tools.retrieval import RetrievalConfig
+from tests.agent_fakes import FakeClock, Misbehaving, ScriptedLLM, completion, text_only
 
-_ids = count(1)
-
-
-def completion(name, args, *, tokens=(100, 20), also=()) -> Completion:
-    """One model turn calling `name`. `args` may be a dict or a raw string."""
-
-    def request(n, a):
-        raw = a if isinstance(a, str) else json.dumps(a)
-        return ToolCallRequest(call_id=f"call_{next(_ids)}", name=n, arguments=raw)
-
-    calls = (request(name, args), *(request(n, a) for n, a in also))
-    return Completion(
-        text=None,
-        tool_calls=calls,
-        usage=Usage(*tokens),
-        served_model="scripted-2026-10-14",
-        finish_reason="tool_calls",
-    )
-
-
-def text_only(text="Let me think about this.") -> Completion:
-    return Completion(text=text, tool_calls=(), usage=Usage(100, 20), served_model="scripted")
-
-
-class FakeClock:
-    def __init__(self) -> None:
-        self.now = 0.0
-
-    def __call__(self) -> float:
-        return self.now
-
-
-class ScriptedLLM:
-    """Plays back completions in order and records what it was shown."""
-
-    model = "scripted"
-
-    def __init__(self, *steps, clock: FakeClock | None = None, advance: float = 0.0) -> None:
-        self.steps = list(steps)
-        self.seen: list[list] = []
-        self.tools_offered: list[str] = []
-        self.clock = clock
-        self.advance = advance
-
-    async def complete(self, messages, tools):
-        self.seen.append(list(messages))
-        self.tools_offered = [t.name for t in tools]
-        if self.clock is not None:
-            self.clock.now += self.advance
-        if not self.steps:
-            raise AssertionError("scripted LLM ran out of steps")
-        step = self.steps.pop(0)
-        if isinstance(step, BaseException):
-            raise step
-        if callable(step):
-            return await step()
-        return step
-
-    def last_observation(self, turn: int) -> str:
-        """The tool result the model saw at the start of `turn` (0-based)."""
-        results = [m for m in self.seen[turn] if isinstance(m, ToolResult)]
-        return results[-1].content
-
-
-class Misbehaving:
-    def __init__(self, *, text: str = "{}", delay: float = 0.0) -> None:
-        self.text, self.delay = text, delay
-
-    def handle(self, request: dict) -> dict:
-        if self.delay:
-            time.sleep(self.delay)
-        return {
-            "jsonrpc": "2.0",
-            "id": request["id"],
-            "result": {"content": [{"type": "text", "text": self.text}], "isError": False},
-        }
+def reads(server) -> list[dict]:
+    """Audit records for the model's read calls. The gate's writes — sent
+    replies, filed escalations — share the audit log and are left out."""
+    return [r for r in server.audit.records() if not CATALOG[r["tool"]].gated]
 
 
 @pytest.fixture(scope="module")
@@ -124,45 +48,15 @@ def ticket(tickets) -> Ticket:
     return tickets["T-001"]
 
 
-@pytest.fixture
-def ctx(tmp_path) -> ToolContext:
-    return ToolContext.build(var_dir=tmp_path / "var", retrieval=RetrievalConfig())
-
-
-@pytest.fixture
-def server(ctx, tmp_path) -> MCPServer:
-    return MCPServer(granted_scopes=READ_SCOPES, context=ctx, var_dir=tmp_path / "var")
-
-
-@pytest.fixture
-def trace(tmp_path) -> TraceLog:
-    return TraceLog(tmp_path / "var" / "trace" / "trace.jsonl")
-
-
-@pytest.fixture
-def make(server, trace):
-    def build(llm, *, executor=None, clock=time.monotonic, spend=None, **config) -> AgentLoop:
-        return AgentLoop(
-            llm=llm,
-            executor=executor or MCPToolExecutor(server, timeout=5),
-            trace=trace,
-            config=AgentConfig(**config),
-            clock=clock,
-            spend=spend,
-        )
-
-    return build
-
-
 # --- the ordinary path -------------------------------------------------------
 
 
 @pytest.mark.asyncio
-async def test_a_reply_resolves_and_is_held_not_sent(make, ticket, ctx, server) -> None:
+async def test_a_covered_reply_resolves_and_is_sent(make, ticket, ctx, server) -> None:
     llm = ScriptedLLM(
         completion("lookup_customer", {"customer_id": ticket.customer_id}),
         completion("retrieve_policy", {"query": "refund window monthly plan"}),
-        completion("send_reply", {"ticket_id": ticket.ticket_id, "body": "Refunded under REF-001.1."}),
+        completion("send_reply", {"ticket_id": ticket.ticket_id, "body": "We have looked into it."}),
     )
     result = await make(llm).run(ticket)
 
@@ -171,9 +65,9 @@ async def test_a_reply_resolves_and_is_held_not_sent(make, ticket, ctx, server) 
     assert [c.tool.value for c in result.tool_calls] == [
         "lookup_customer", "retrieve_policy", "send_reply",
     ]
-    assert ctx.store.records("replies") == [], "gated calls are proposals, never executed"
+    assert [r["body"] for r in ctx.store.records("replies")] == ["We have looked into it."]
     audited = server.audit.records()
-    assert [r["tool"] for r in audited] == ["lookup_customer", "retrieve_policy"]
+    assert [r["tool"] for r in audited] == ["lookup_customer", "retrieve_policy", "send_reply"]
     assert {r["run_id"] for r in audited} == {result.run_id}
 
 
@@ -188,7 +82,7 @@ async def test_the_model_sees_each_observation(make, ticket) -> None:
 
 
 @pytest.mark.asyncio
-async def test_an_escalation_ends_in_escalate(make, ticket, ctx) -> None:
+async def test_an_escalation_ends_in_escalate_and_is_filed(make, ticket, ctx) -> None:
     llm = ScriptedLLM(
         completion("escalate", {"ticket_id": ticket.ticket_id, "reason": "ESC-001.6: policy is silent"}),
     )
@@ -196,25 +90,25 @@ async def test_an_escalation_ends_in_escalate(make, ticket, ctx) -> None:
     assert result.outcome is Outcome.ESCALATE
     assert result.final_state == "ESCALATE"
     assert result.cited_policy_ids == ["POL-ESC-001"]
-    assert ctx.store.records("escalations") == []
+    [filed] = ctx.store.records("escalations")
+    assert filed["reason"] == "ESC-001.6: policy is silent"
 
 
 @pytest.mark.asyncio
-async def test_a_refund_is_held_and_the_run_continues(make, ticket, ctx, trace) -> None:
+async def test_a_small_refund_executes_and_the_run_continues(make, ticket, ctx, trace) -> None:
     llm = ScriptedLLM(
-        completion("issue_refund", {"ticket_id": ticket.ticket_id, "amount": 29, "reason": "REF-001.1"}),
-        completion("send_reply", {"ticket_id": ticket.ticket_id, "body": "Submitted."}),
+        completion("issue_refund", {"ticket_id": ticket.ticket_id, "amount": 29, "reason": "duplicate charge"}),
+        completion("send_reply", {"ticket_id": ticket.ticket_id, "body": "Refunded."}),
     )
     result = await make(llm).run(ticket)
 
     assert result.outcome is Outcome.RESOLVE
-    held = json.loads(llm.last_observation(1))
-    assert held["status"] == "held"
-    assert "not" in held["message"] and "executed" in held["message"]
-    assert ctx.store.records("refunds") == []
-    proposals = [r for r in trace.records(result.run_id) if r["event"] == "proposal"]
-    assert [p["tool"] for p in proposals] == ["issue_refund", "send_reply"]
-    assert all(p["held"] for p in proposals)
+    assert json.loads(llm.last_observation(1))["status"] == "recorded"
+    assert [r["amount"] for r in ctx.store.records("refunds")] == [29.0]
+    gate = [r for r in trace.records(result.run_id) if r["event"] == "gate"]
+    assert [(g["tool"], g["verdict"]) for g in gate] == [
+        ("issue_refund", "execute"), ("send_reply", "execute"),
+    ]
 
 
 @pytest.mark.asyncio
@@ -379,7 +273,7 @@ async def test_failure_case_repeated_call_is_not_rerun_then_escalates(make, tick
     result = await make(llm, max_repeats=2).run(ticket)
 
     assert json.loads(llm.last_observation(2))["error"] == "duplicate_call"
-    assert len(server.audit.records()) == 1, "a duplicate is not executed"
+    assert len(reads(server)) == 1, "a duplicate is not executed"
     assert result.final_state == "ESCALATE"
     assert "loop" in result.stop_reason
 
@@ -441,7 +335,7 @@ async def test_only_the_first_of_several_calls_runs(make, ticket, server) -> Non
     )
     await make(llm).run(ticket)
 
-    assert [r["tool"] for r in server.audit.records()] == ["lookup_customer"]
+    assert [r["tool"] for r in reads(server)] == ["lookup_customer"]
     results = [m for m in llm.seen[1] if isinstance(m, ToolResult)]
     assert len(results) == 2, "every requested call gets an answer, executed or not"
     assert json.loads(results[1].content)["error"] == "not_executed"
@@ -461,7 +355,7 @@ async def test_failure_case_step_budget_exhausted(make, ticket, server) -> None:
 
     assert result.final_state == "ESCALATE"
     assert "step budget" in result.stop_reason
-    assert len(server.audit.records()) == 2
+    assert len(reads(server)) == 2
 
 
 @pytest.mark.asyncio
@@ -540,7 +434,10 @@ def test_pricing_is_per_million_tokens() -> None:
 
 
 def test_the_loop_is_granted_read_scopes_only() -> None:
+    """The model's calls go to a read-only server; writes go to a separate
+    server that only the gate dispatches to."""
     assert READ_SCOPES == {Scope.CUSTOMER_READ, Scope.TICKETS_READ, Scope.POLICY_READ}
+    assert WRITE_SCOPES == {Scope.REFUND_WRITE, Scope.REPLY_WRITE, Scope.ESCALATION_WRITE}
 
 
 @pytest.mark.asyncio

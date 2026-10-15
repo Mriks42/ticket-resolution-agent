@@ -17,7 +17,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 PROMPT_DIR = Path(__file__).parent / "prompts"
-DEFAULT_PROMPT_VERSION = "system_v1"
+#: v2 (session 6) changes only the last paragraph: gated actions now pass
+#: through the HITL gate instead of being held unconditionally. v1 is kept so
+#: runs recorded under it stay reproducible.
+DEFAULT_PROMPT_VERSION = "system_v2"
 
 
 @dataclass(frozen=True)

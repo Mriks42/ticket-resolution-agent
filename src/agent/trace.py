@@ -11,13 +11,14 @@ depends on the event:
                    served_model, finish_reason, tool_calls, cost_usd
     observation    tool, args, status, content (verbatim, what the model
                    saw), latency_ms, attempts
-    proposal       tool, args, held
+    gate           tool, args, verdict, rule, clause, approver, detail, facts
+    escalation_filed  filed_by (model | system), reason, status, message
     run_finished   final_state, outcome, stop_reason, steps, tokens,
                    cost_usd, elapsed_s
 
 The MCP audit log (`src/mcp/audit.py`) is a separate file with a separate
 job: it records every tool call the *server* saw. The trace records what the
-*loop* decided, including calls it never forwarded — held proposals,
+*loop* decided, including calls it never forwarded — gate decisions,
 duplicates, invalid calls. Joined on run_id, the two reconstruct a run.
 """
 
@@ -29,7 +30,10 @@ from pathlib import Path
 from typing import Any
 
 EVENTS = frozenset(
-    {"run_started", "transition", "llm_call", "observation", "proposal", "run_finished"}
+    {
+        "run_started", "transition", "llm_call", "observation", "gate",
+        "escalation_filed", "run_finished",
+    }
 )
 
 

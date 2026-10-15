@@ -21,7 +21,7 @@ import pytest
 from evals.loader import load_tickets
 from src.agent.config import AgentConfig
 from src.agent.executor import MCPToolExecutor
-from src.agent.loop import READ_SCOPES, AgentLoop
+from src.agent.loop import READ_SCOPES, WRITE_SCOPES, AgentLoop
 from src.agent.openai_chat import OpenAIChatClient
 from src.agent.pricing import SpendGuard
 from src.agent.trace import TraceLog
@@ -45,6 +45,7 @@ async def test_one_ticket_end_to_end_against_the_real_model(tmp_path) -> None:
     ticket = next(t for t in load_tickets() if t.ticket_id == "T-001")
     ctx = ToolContext.build(var_dir=tmp_path / "var", retrieval=RetrievalConfig())
     server = MCPServer(granted_scopes=READ_SCOPES, context=ctx, var_dir=tmp_path / "var")
+    writer = MCPServer(granted_scopes=WRITE_SCOPES, context=ctx, var_dir=tmp_path / "var")
     trace = TraceLog(tmp_path / "trace.jsonl")
     config = AgentConfig()
     guard = SpendGuard.for_model(config.model, cap_usd=0.05)
@@ -52,13 +53,14 @@ async def test_one_ticket_end_to_end_against_the_real_model(tmp_path) -> None:
     loop = AgentLoop(
         llm=OpenAIChatClient(model=config.model, api_key=key),
         executor=MCPToolExecutor(server, timeout=config.tool_timeout),
+        writer=MCPToolExecutor(writer, timeout=config.tool_timeout),
         trace=trace,
         config=config,
         spend=guard,
     )
     result = await loop.run(ticket)
 
-    assert result.final_state in {"RESOLVE", "ESCALATE"}, result.stop_reason
+    assert result.final_state in {"RESOLVE", "ESCALATE", "PENDING_APPROVAL"}, result.stop_reason
     assert result.tool_calls, "the model called no tool at all"
     calls = [e for e in trace.records(result.run_id) if e["event"] == "llm_call"]
     assert calls and all(c["input_tokens"] > 0 for c in calls)
