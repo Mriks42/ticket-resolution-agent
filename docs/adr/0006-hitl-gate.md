@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted.
+Accepted. The coverage rules in the table below (a reply or refund reason
+citing an unretrieved clause) moved to the retrieval guardrail in ADR 0007,
+which runs before the gate. The gate keeps the owner check, the bands and
+pending approval.
 
 ## Context
 
