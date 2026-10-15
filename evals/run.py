@@ -2,6 +2,12 @@
 
     python -m evals.run
     python -m evals.run --agent evals.agents.stub:AlwaysEscalateAgent --out report.json
+    python -m evals.run --agent src.agent.loop:LoopAgent
+
+The real agent reads its configuration from the environment; `.env` is loaded
+at startup. It calls the real model and is capped by EVAL_SPEND_CAP_USD
+(default $1.00): a run that would exceed the cap aborts rather than reporting
+partial numbers.
 """
 
 from __future__ import annotations
@@ -18,6 +24,7 @@ from pathlib import Path
 from evals.loader import POLICY_DIR, TICKETS_PATH, load_tickets
 from evals.metrics import DEFAULT_RESAMPLES, DEFAULT_SEED, MetricResult, evaluate
 from evals.schema import Agent, AgentResult, Confidence, Outcome, Ticket
+from src.config import load_dotenv
 
 
 def load_agent(spec: str) -> Agent:
@@ -72,6 +79,7 @@ def format_report(
         "agent outcomes     " + "  ".join(
             f"{o.value}={pred.get(o.value, 0)}" for o in Outcome
         ),
+        *_final_states_line(tickets, results),
         "",
         f"{'metric':<24}{'value':>8}  {'95% CI':<18}{'n':>12}",
         "-" * 64,
@@ -133,6 +141,17 @@ def format_report(
     return "\n".join(lines)
 
 
+def _final_states_line(tickets: list[Ticket], results: dict[str, AgentResult]) -> list[str]:
+    """The loop's terminal states, when the agent reports them. FAILED is
+    folded into escalate above, so it is shown here to stay countable."""
+    states = Counter(
+        results[t.ticket_id].final_state for t in tickets if results[t.ticket_id].final_state
+    )
+    if not states:
+        return []
+    return ["agent final states " + "  ".join(f"{k}={v}" for k, v in sorted(states.items()))]
+
+
 def _wrap(text: str, width: int) -> list[str]:
     words, lines, current = text.split(), [], ""
     for word in words:
@@ -177,6 +196,9 @@ def build_report(
                 "called_tools": [
                     c.tool.value for c in results[t.ticket_id].tool_calls
                 ],
+                "final_state": results[t.ticket_id].final_state,
+                "stop_reason": results[t.ticket_id].stop_reason,
+                "run_id": results[t.ticket_id].run_id,
             }
             for t in tickets
         ],
@@ -192,6 +214,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
     parser.add_argument("--out", type=Path, help="write the JSON report here")
     args = parser.parse_args(argv)
+    load_dotenv()
 
     tickets = load_tickets(args.dataset, args.policies)
     agent = load_agent(args.agent)
