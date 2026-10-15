@@ -1,8 +1,9 @@
 """The HITL gate's rules, as pure decisions.
 
 No loop, no model, no tools: given an action and the facts the gate holds,
-what does it decide? These are the deterministic rules CLAUDE.md asks for —
-action type and retrieval coverage, never model confidence.
+what does it decide? These are the action-type rules CLAUDE.md asks for,
+never model confidence. Retrieval coverage is the guardrail's, in
+`test_guardrail.py`.
 """
 
 from __future__ import annotations
@@ -15,7 +16,6 @@ from src.agent.gate import (
     MANAGER_REFUND_MAX,
     SELF_SERVE_REFUND_MAX,
     Verdict,
-    cited_clause_ids,
     decide_refund,
     decide_reply,
 )
@@ -24,14 +24,9 @@ from src.tools.policy import load_clauses
 OWNER = "r.mehta@brightfold.example"
 
 
-def refund(amount, *, already=0, requester=OWNER, owner=OWNER, cited=(), retrieved=()):
+def refund(amount, *, already=0, requester=OWNER, owner=OWNER):
     return decide_refund(
-        amount=amount,
-        already_refunded=already,
-        requester_email=requester,
-        owner_email=owner,
-        cited=set(cited),
-        retrieved=set(retrieved),
+        amount=amount, already_refunded=already, requester_email=requester, owner_email=owner,
     )
 
 
@@ -120,48 +115,14 @@ def test_the_owner_check_comes_before_the_band() -> None:
     assert refund(1584, requester="x@y.example").verdict is Verdict.ESCALATE
 
 
-# --- coverage: every cited clause must have been retrieved ---------------------------
+# --- replies ------------------------------------------------------------------------
 
 
-def test_a_refund_reason_citing_an_unretrieved_clause_escalates() -> None:
-    decision = refund(29, cited={"REF-001.1"}, retrieved={"REF-001.2"})
-    assert decision.verdict is Verdict.ESCALATE
-    assert decision.rule == "citation_not_retrieved"
-    assert "REF-001.1" in decision.detail
-
-
-def test_a_reply_citing_retrieved_clauses_executes() -> None:
-    decision = decide_reply(cited={"REF-001.1"}, retrieved={"REF-001.1", "REF-001.2"}, pending=False)
-    assert decision.verdict is Verdict.EXECUTE
-
-
-def test_a_reply_citing_an_unretrieved_clause_is_a_hallucinated_policy_event() -> None:
-    decision = decide_reply(cited={"REF-001.1", "CAN-002.2"}, retrieved={"REF-001.1"}, pending=False)
-    assert decision.verdict is Verdict.ESCALATE
-    assert decision.rule == "citation_not_retrieved"
-    assert "CAN-002.2" in decision.detail
-
-
-def test_a_reply_with_no_citations_executes() -> None:
-    """Uncited policy claims are the guardrail's to catch, not the gate's."""
-    assert decide_reply(cited=set(), retrieved=set(), pending=False).verdict is Verdict.EXECUTE
+def test_a_reply_executes_when_nothing_is_pending() -> None:
+    assert decide_reply(pending=False).verdict is Verdict.EXECUTE
 
 
 def test_a_reply_while_an_approval_is_pending_is_held_with_it() -> None:
-    decision = decide_reply(cited=set(), retrieved=set(), pending=True)
+    decision = decide_reply(pending=True)
     assert decision.verdict is Verdict.HOLD
     assert decision.rule == "approval_pending"
-
-
-def test_coverage_is_checked_before_a_pending_hold() -> None:
-    """A hallucinated citation is never parked for approval."""
-    decision = decide_reply(cited={"REF-001.9"}, retrieved=set(), pending=True)
-    assert decision.verdict is Verdict.ESCALATE
-
-
-# --- citations --------------------------------------------------------------------
-
-
-def test_only_full_clause_ids_count_as_citations() -> None:
-    text = "Per REF-001.3 and (CAN-002.2). See POL-REF-001 and ESC-001 generally."
-    assert cited_clause_ids(text) == {"REF-001.3", "CAN-002.2"}

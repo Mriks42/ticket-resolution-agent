@@ -11,6 +11,7 @@ depends on the event:
                    served_model, finish_reason, tool_calls, cost_usd
     observation    tool, args, status, content (verbatim, what the model
                    saw), latency_ms, attempts
+    guardrail      tool, mode (block | detect), violations [{kind, detail, sentence}]
     gate           tool, args, verdict, rule, clause, approver, detail, facts
     escalation_filed  filed_by (model | system), reason, status, message
     run_finished   final_state, outcome, stop_reason, steps, tokens,
@@ -31,7 +32,7 @@ from typing import Any
 
 EVENTS = frozenset(
     {
-        "run_started", "transition", "llm_call", "observation", "gate",
+        "run_started", "transition", "llm_call", "observation", "guardrail", "gate",
         "escalation_filed", "run_finished",
     }
 )

@@ -14,22 +14,25 @@ Three verdicts:
               PENDING_APPROVAL unless the model escalates
 - `ESCALATE`  the action must not run and a human takes the ticket
 
+The gate is the *action-type* half of CLAUDE.md's rule. The *coverage* half —
+whether a claim is backed by a retrieved passage — is the guardrail
+(`src/agent/guardrail.py`), which the loop runs first. It moved there from
+here in ADR 0007, so the "without guardrail" ablation can switch every
+claim-against-retrieval check off together.
+
 The rules, in the order they are applied:
 
 **Refunds.** (1) Owner check, ESC-001.4: a refund for anyone other than the
 verified account owner escalates, whatever the amount. An owner the gate cannot
-verify fails closed. (2) Coverage: a refund reason citing a clause that was
-not retrieved escalates. (3) Band, ESC-001.1–.3, applied to the ticket's
-running total (refunds already executed or held, plus this one): up to USD 50
+verify fails closed. (2) Band, ESC-001.1–.3, applied to the ticket's running
+total (refunds already executed or held, plus this one): up to USD 50
 executes, up to USD 500 waits for a support manager, above that for finance.
 Banding the total rather than each refund means a refund cannot be split into
 pieces that each look self-serve; ADR 0006 records the decision.
 
-**Replies.** (1) Coverage: a reply citing a clause that was not retrieved in
-this run is a hallucinated-policy event and escalates. (2) If an approval is
-pending, the reply is held with it as one package. (3) Otherwise it executes.
-The owner check does not apply to replies (decided with the label owner): a
-non-owner can be answered, not refunded.
+**Replies.** If an approval is pending, the reply is held with it as one
+package; otherwise it executes. The owner check does not apply to replies
+(decided with the label owner): a non-owner can be answered, not refunded.
 
 The band thresholds are policy copied into code, which ADR 0003 decided on
 purpose: the bands are arithmetic on a number the agent holds, not something
@@ -39,7 +42,6 @@ against the clause text, so the copy cannot drift silently.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
@@ -49,9 +51,6 @@ SELF_SERVE_REFUND_MAX = Decimal("50.00")
 #: ESC-001.2: "between USD 50.01 and USD 500 requires support manager approval".
 #: Above it, ESC-001.3: "requires finance approval".
 MANAGER_REFUND_MAX = Decimal("500.00")
-
-_CLAUSE_ID = re.compile(r"\b[A-Z]{3}-\d{3}\.\d+\b")
-
 
 class Verdict(str, Enum):
     EXECUTE = "execute"
@@ -68,20 +67,12 @@ class Decision:
     approver: str | None = None
 
 
-def cited_clause_ids(text: str) -> set[str]:
-    """Full clause ids only. `POL-REF-001` or a bare `ESC-001` is not a citation
-    of anything checkable."""
-    return set(_CLAUSE_ID.findall(text))
-
-
 def decide_refund(
     *,
     amount: float,
     already_refunded: float,
     requester_email: str,
     owner_email: str | None,
-    cited: set[str],
-    retrieved: set[str],
 ) -> Decision:
     if owner_email is None:
         return Decision(
@@ -95,10 +86,6 @@ def decide_refund(
             "refund requested by someone other than the verified account owner",
             clause="ESC-001.4",
         )
-
-    uncovered = _uncovered(cited, retrieved)
-    if uncovered:
-        return uncovered
 
     cents = _cents(amount)
     total = _cents(already_refunded) + cents
@@ -122,26 +109,13 @@ def decide_refund(
     )
 
 
-def decide_reply(*, cited: set[str], retrieved: set[str], pending: bool) -> Decision:
-    uncovered = _uncovered(cited, retrieved)
-    if uncovered:
-        return uncovered
+def decide_reply(*, pending: bool) -> Decision:
     if pending:
         return Decision(
             Verdict.HOLD, "approval_pending",
             "held with the pending approval, so the customer is not told before it is decided",
         )
-    return Decision(Verdict.EXECUTE, "covered", "every cited clause was retrieved in this run")
-
-
-def _uncovered(cited: set[str], retrieved: set[str]) -> Decision | None:
-    missing = sorted(cited - retrieved)
-    if not missing:
-        return None
-    return Decision(
-        Verdict.ESCALATE, "citation_not_retrieved",
-        f"cites {', '.join(missing)}, which no retrieval in this run returned",
-    )
+    return Decision(Verdict.EXECUTE, "nothing_pending", "no approval is pending on this ticket")
 
 
 def _cents(amount: float) -> Decimal:

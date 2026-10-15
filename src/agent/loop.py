@@ -7,6 +7,12 @@
 The transitions are the table in `src/agent/states.py`; every hop is checked
 against it and written to the trace with the run_id.
 
+**Replies and refund reasons are checked by the guardrail first**
+(`src/agent/guardrail.py`, ADR 0007): every policy fact must be grounded in a
+passage shown in this run or in the customer's own data. In block mode a
+violation stops the action and escalates; in detect mode it is logged and the
+action proceeds.
+
 **Gated calls go through the HITL gate** (`src/agent/gate.py`, ADR 0006).
 The model's own calls reach a server granted read scopes only. A gated call is
 decided by the gate's deterministic rules and then carried out by the loop:
@@ -52,12 +58,14 @@ import re
 import time
 import uuid
 from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 
 from evals.schema import AgentResult, Outcome, Ticket, Tool, ToolCall
 from src.agent.config import AgentConfig
 from src.agent.executor import MCPToolExecutor, Observation, ToolExecutor
-from src.agent.gate import Decision, Verdict, cited_clause_ids, decide_refund, decide_reply
+from src.agent.gate import Decision, Verdict, decide_refund, decide_reply
+from src.agent.guardrail import Fact, Sources, account_grounding, history_text, usd
+from src.agent.guardrail import check as check_claims
 from src.agent.llm import (
     Assistant,
     Completion,
@@ -159,9 +167,14 @@ class _Run:
     extras: tuple[ToolCallRequest, ...] = ()
     #: Messages to hand the model at OBSERVE.
     pending: list[Message] = field(default_factory=list)
-    #: Clause ids the model has been shown in this run, by retrieval or by the
-    #: gate. A citation outside this set is a hallucinated-policy event.
-    retrieved: set[str] = field(default_factory=set)
+    #: clause_id -> text for every passage the model has been shown in this
+    #: run, by retrieval or by the gate. What the guardrail checks against.
+    passages: dict[str, str] = field(default_factory=dict)
+    #: The customer's own words and records, and facts from the run's own
+    #: actions (refund amounts). Restating these is not a policy claim.
+    context: list[str] = field(default_factory=list)
+    context_facts: set[Fact] = field(default_factory=set)
+    reply_violations: list = field(default_factory=list)
     #: Gated actions waiting for an approver.
     held: list[dict] = field(default_factory=list)
     #: Refunds on this ticket so far, executed or held. The gate bands the total.
@@ -203,6 +216,7 @@ class AgentLoop:
     async def run(self, ticket: Ticket) -> AgentResult:
         run = _Run(run_id=f"run-{uuid.uuid4().hex[:12]}", ticket=ticket, started=self._clock())
         run.messages = [System(self._prompt.text), User(render_ticket(ticket))]
+        run.context.append(ticket.body)
         self._trace.emit(
             run.run_id,
             "run_started",
@@ -214,6 +228,7 @@ class AgentLoop:
             prompt_version=self._prompt.version,
             prompt_sha256=self._prompt.sha256,
             budgets=self._config.budgets(),
+            guardrail_mode=self._config.guardrail_mode,
             context=self._context,
         )
 
@@ -247,6 +262,7 @@ class AgentLoop:
             cited_policy_ids=cited_policy_ids(run.proposal_texts),
             final_state=run.state.value,
             stop_reason=run.stop_reason,
+            policy_violations=[f"{v.kind}: {v.detail}" for v in run.reply_violations],
         )
 
     # --- states ------------------------------------------------------------
@@ -358,9 +374,10 @@ class AgentLoop:
                 f"wall-clock budget exhausted ({cfg.max_seconds:g}s) during {call.name}",
             )
         content = obs.for_model()
+        if obs.status == "ok":
+            self._absorb(run, call.name, obs.payload)
         if call.name == "retrieve_policy" and obs.status == "ok":
             passages = obs.payload.get("passages") or []
-            run.retrieved |= {p["clause_id"] for p in passages if isinstance(p, dict) and "clause_id" in p}
             if not passages:
                 content = json.dumps({**obs.payload, "note": EMPTY_RETRIEVAL_NOTE})
         self._respond(
@@ -378,6 +395,9 @@ class AgentLoop:
             )
             return self._go(run, State.ESCALATE, "escalate proposed")
 
+        if self._guard(run, call, args):
+            return
+
         facts: dict = {}
         if call.name == "issue_refund":
             owner = await self._owner_email(run)
@@ -391,15 +411,9 @@ class AgentLoop:
                 already_refunded=run.refunded,
                 requester_email=run.ticket.requester_email,
                 owner_email=owner,
-                cited=cited_clause_ids(str(args.get("reason", ""))),
-                retrieved=run.retrieved,
             )
         else:
-            decision = decide_reply(
-                cited=cited_clause_ids(str(args.get("body", ""))),
-                retrieved=run.retrieved,
-                pending=bool(run.held),
-            )
+            decision = decide_reply(pending=bool(run.held))
         self._gate_event(run, call, args, decision, facts)
 
         if decision.verdict is Verdict.ESCALATE:
@@ -417,6 +431,7 @@ class AgentLoop:
                 "approver": decision.approver, "clause": decision.clause,
             })
             run.refunded += args["amount"]
+            run.context_facts.add(usd(args["amount"]))
             content = json.dumps({
                 "status": "pending_approval",
                 "approver": decision.approver,
@@ -442,6 +457,7 @@ class AgentLoop:
             return self._go(run, State.RESOLVE, "reply sent")
         if call.name == "issue_refund" and obs.status == "ok":
             run.refunded += args["amount"]
+            run.context_facts.add(usd(args["amount"]))
         content = obs.for_model()
         if obs.status == "ok" and decision.clause:
             content = json.dumps({**obs.payload, "policy": self._show_clause(run, decision.clause)})
@@ -458,6 +474,8 @@ class AgentLoop:
                 "lookup_customer", {"customer_id": run.ticket.customer_id}, run_id=run.run_id
             )
             run.owner_checked = True
+            if obs.status == "ok":
+                self._absorb(run, "lookup_customer", obs.payload)
             owner = obs.payload.get("owner_email") if obs.status == "ok" else None
             run.owner_email = owner if isinstance(owner, str) and owner.strip() else None
         return run.owner_email
@@ -468,8 +486,54 @@ class AgentLoop:
         clause = self._clause_lookup(clause_id) if clause_id else None
         if clause is None:
             return None
-        run.retrieved.add(clause.clause_id)
+        run.passages[clause.clause_id] = clause.text
         return {"clause_id": clause.clause_id, "text": clause.text}
+
+    def _guard(self, run: _Run, call: ToolCallRequest, args: dict) -> bool:
+        """Run the guardrail on a reply body or refund reason. True if it
+        blocked the action (and moved the run to ESCALATE)."""
+        if call.name not in ("send_reply", "issue_refund"):
+            return False
+        own = {usd(args["amount"])} if call.name == "issue_refund" else set()
+        text = args.get("body") if call.name == "send_reply" else args.get("reason")
+        violations = check_claims(
+            str(text or ""),
+            Sources(
+                passages=dict(run.passages),
+                context=tuple(run.context),
+                context_facts=frozenset(run.context_facts | own),
+            ),
+        )
+        mode = self._config.guardrail_mode
+        self._trace.emit(
+            run.run_id, "guardrail",
+            tool=call.name, mode=mode, violations=[asdict(v) for v in violations],
+        )
+        if call.name == "send_reply":
+            run.reply_violations = violations
+        if not violations or mode != "block":
+            return False
+        first = violations[0]
+        more = f" (+{len(violations) - 1} more)" if len(violations) > 1 else ""
+        self._go(
+            run, State.ESCALATE,
+            f"hallucinated policy in {call.name}: {first.kind}, {first.detail}{more}",
+        )
+        return True
+
+    def _absorb(self, run: _Run, tool: str, payload: dict) -> None:
+        """Keep what a read returned that the guardrail must know about:
+        passage text, and the customer's own figures and history."""
+        if tool == "retrieve_policy":
+            for p in payload.get("passages") or []:
+                if isinstance(p, dict) and isinstance(p.get("clause_id"), str):
+                    run.passages[p["clause_id"]] = str(p.get("text", ""))
+        elif tool == "lookup_customer":
+            texts, facts = account_grounding(payload)
+            run.context.extend(texts)
+            run.context_facts |= facts
+        elif tool == "search_past_tickets":
+            run.context.extend(history_text(payload.get("matches")))
 
     async def _file_escalation(
         self, run: _Run, reason: str, *, filed_by: str, model_trace=None

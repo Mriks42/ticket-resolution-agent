@@ -39,7 +39,16 @@ class AgentConfig:
     #: model is told it already has the answer. This many repeats ends the run.
     max_repeats: int = 2
 
+    #: "block": a reply or refund reason with a hallucinated policy fact is not
+    #: carried out and the ticket escalates. "detect": the violation is logged
+    #: and counted, and the action proceeds. The pair is the "with vs without
+    #: guardrail" ablation (ADR 0007); detect still measures, so both arms
+    #: report a hallucinated-policy rate.
+    guardrail_mode: str = "block"
+
     def __post_init__(self) -> None:
+        if self.guardrail_mode not in ("block", "detect"):
+            raise ValueError(f"guardrail_mode must be 'block' or 'detect', got {self.guardrail_mode!r}")
         for name in ("max_steps", "max_tokens", "max_invalid_calls", "max_repeats"):
             if getattr(self, name) < 1:
                 raise ValueError(f"{name} must be at least 1, got {getattr(self, name)}")
@@ -69,6 +78,7 @@ class AgentConfig:
             max_tokens=get("AGENT_MAX_TOKENS", int, defaults.max_tokens),
             max_seconds=get("AGENT_MAX_WALL_CLOCK_SECONDS", float, defaults.max_seconds),
             tool_timeout=get("AGENT_TOOL_TIMEOUT_SECONDS", float, defaults.tool_timeout),
+            guardrail_mode=get("GUARDRAIL_MODE", str, defaults.guardrail_mode),
         )
 
     def budgets(self) -> dict:

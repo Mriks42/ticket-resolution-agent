@@ -154,21 +154,23 @@ async def test_a_non_owner_can_still_be_answered(make, non_owner_ticket, ctx) ->
     assert len(ctx.store.records("replies")) == 1
 
 
-# --- coverage ---------------------------------------------------------------------------
+# --- coverage, enforced by the guardrail ahead of the gate --------------------------------
 
 
 @pytest.mark.asyncio
 async def test_a_reply_citing_an_unretrieved_clause_is_a_hallucinated_policy_event(
     make, owner_ticket, ctx, trace
 ) -> None:
+    """Coverage is the guardrail's (ADR 0007), and it runs before the gate."""
     llm = ScriptedLLM(reply(owner_ticket, "Annual renewals are refundable within 14 days (REF-001.3)."))
     result = await make(llm).run(owner_ticket)
 
     assert result.final_state == "ESCALATE"
     assert "REF-001.3" in result.stop_reason
     assert ctx.store.records("replies") == []
-    [decision] = gate_events(trace, result.run_id)
-    assert decision["rule"] == "citation_not_retrieved"
+    assert gate_events(trace, result.run_id) == [], "blocked before the gate decided"
+    [check] = [e for e in trace.records(result.run_id) if e["event"] == "guardrail"]
+    assert check["violations"][0]["kind"] == "citation_not_retrieved"
     assert len(ctx.store.records("escalations")) == 1
 
 

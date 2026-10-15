@@ -131,6 +131,9 @@ class AgentResult(BaseModel):
     final_state: str | None = None
     #: Why the run stopped, in words. Set when the loop, not the model, ended it.
     stop_reason: str | None = None
+    #: Hallucinated-policy events in the drafted reply, "kind: detail", as the
+    #: guardrail found them — whether or not it blocked the reply (ADR 0007).
+    policy_violations: list[str] = []
 
 
 @runtime_checkable
