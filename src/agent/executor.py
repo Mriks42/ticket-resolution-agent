@@ -15,11 +15,14 @@ outcomes, each a distinct status the model and the trace can see:
 - `malformed`  the tool answered with something that is not a JSON object
 - `timeout`    no answer within `timeout`, after retries
 
-Only timeouts are retried. Every tool reachable here is a read, so repeating
-one is safe; an error or a malformed answer would come back the same way.
+Only timeouts are retried, and only for reads: repeating a read is safe,
+and an error or a malformed answer would come back the same way.
 
-A timed-out call's worker thread is abandoned, not killed — Python cannot
-kill a thread. It finishes in the background and its result is discarded.
+**Writes are never retried** (`MCPToolExecutor.for_writes`). A timed-out
+call's worker thread is abandoned, not killed — Python cannot kill a thread —
+so it may still finish in the background. For a read that is harmless; for a
+refund, a retry after a timeout could pay twice. The loop treats a refund
+that timed out as an unknown outcome and escalates (ADR 0006).
 """
 
 from __future__ import annotations
@@ -76,6 +79,11 @@ class MCPToolExecutor:
         self._retry = retry
         self._sleep = sleep
         self._ids = itertools.count(1)
+
+    @classmethod
+    def for_writes(cls, server: Dispatcher, *, timeout: float = 20.0) -> MCPToolExecutor:
+        """One attempt, no retry. See the module docstring."""
+        return cls(server, timeout=timeout, retry=RetryPolicy(max_attempts=1, backoff_base=0.0, backoff_cap=0.0))
 
     async def call(self, name: str, arguments: dict, *, run_id: str) -> Observation:
         started = time.perf_counter()

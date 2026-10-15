@@ -429,6 +429,11 @@ class AgentLoop:
             )
 
         obs = await self._writer.call(call.name, args, run_id=run.run_id)
+        if call.name == "issue_refund" and obs.status == "timeout":
+            return self._go(
+                run, State.ESCALATE,
+                "refund outcome unknown: issue_refund timed out and may or may not have executed",
+            )
         if call.name == "send_reply":
             if obs.status != "ok":
                 return self._go(
@@ -589,7 +594,7 @@ class LoopAgent(AgentLoop):
         super().__init__(
             llm=OpenAIChatClient(model=config.model, temperature=config.temperature, seed=config.seed),
             executor=MCPToolExecutor(reader, timeout=config.tool_timeout),
-            writer=MCPToolExecutor(writer, timeout=config.tool_timeout),
+            writer=MCPToolExecutor.for_writes(writer, timeout=config.tool_timeout),
             clause_lookup=context.fixtures.policy.get,
             trace=TraceLog.in_var_dir(context.var_dir),
             config=config,

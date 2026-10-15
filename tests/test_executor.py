@@ -144,3 +144,14 @@ async def test_what_the_model_sees_names_the_failure() -> None:
     )
     seen = obs.for_model()
     assert '"error": "malformed"' in seen
+
+
+@pytest.mark.asyncio
+async def test_a_write_executor_never_retries() -> None:
+    """A retried write can execute twice: the timed-out attempt's thread is
+    abandoned, not killed, and may still finish. Writes get one attempt."""
+    dispatcher = Misbehaving(delay=0.3)
+    obs = await MCPToolExecutor.for_writes(dispatcher, timeout=0.05).call("issue_refund", {}, run_id="r")
+    assert obs.status == "timeout"
+    assert obs.attempts == 1
+    assert dispatcher.calls == 1

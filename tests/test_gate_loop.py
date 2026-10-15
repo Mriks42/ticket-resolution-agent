@@ -244,3 +244,24 @@ async def test_a_reply_that_cannot_be_sent_escalates(make, owner_ticket, ctx) ->
     assert result.final_state == "ESCALATE"
     assert "could not be sent" in result.stop_reason
 
+
+@pytest.mark.asyncio
+async def test_a_refund_that_times_out_escalates_as_unknown(make, owner_ticket) -> None:
+    """Whether the money moved is unknown, so a human must check — the run
+    must not carry on as if the refund had simply failed."""
+    llm = ScriptedLLM(refund(owner_ticket, 20), reply(owner_ticket))
+    slow = MCPToolExecutor.for_writes(Misbehaving(delay=0.3), timeout=0.05)
+    result = await make(llm, write_executor=slow).run(owner_ticket)
+    assert result.final_state == "ESCALATE"
+    assert "unknown" in result.stop_reason
+
+
+def test_the_agent_wires_a_non_retrying_writer(monkeypatch, tmp_path) -> None:
+    from src.agent.loop import LoopAgent
+
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-test-not-a-real-key")
+    monkeypatch.setenv("TRA_VAR_DIR", str(tmp_path / "var"))
+    monkeypatch.setenv("RETRIEVAL_BACKEND", "lexical")
+    agent = LoopAgent()
+    assert agent._writer._retry.max_attempts == 1
+    assert agent._executor._retry.max_attempts > 1

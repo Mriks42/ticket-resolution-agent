@@ -79,6 +79,13 @@ from the corpus and fails if the text and the constants disagree.
   PENDING_APPROVAL.
 - **ESCALATE**: the action does not run; the ticket ends in ESCALATE.
 
+**Writes are never retried, and a refund that times out escalates.** Reads
+retry on timeout because repeating one is harmless. A timed-out call's thread
+is abandoned, not killed, so a retried refund could execute twice. The write
+executor makes one attempt. A refund that times out is an unknown outcome,
+where the money may or may not have moved, and goes to a human rather than
+being treated as a failure the model can work around.
+
 **The owner is verified by the gate, not taken from the model.** The gate does
 its own `lookup_customer` through the read server (audited) and compares the
 ticket's `requester_email` with the account's `owner_email`, case- and

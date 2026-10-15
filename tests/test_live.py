@@ -53,7 +53,7 @@ async def test_one_ticket_end_to_end_against_the_real_model(tmp_path) -> None:
     loop = AgentLoop(
         llm=OpenAIChatClient(model=config.model, api_key=key),
         executor=MCPToolExecutor(server, timeout=config.tool_timeout),
-        writer=MCPToolExecutor(writer, timeout=config.tool_timeout),
+        writer=MCPToolExecutor.for_writes(writer, timeout=config.tool_timeout),
         trace=trace,
         config=config,
         spend=guard,

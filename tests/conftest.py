@@ -200,7 +200,7 @@ def make(server, writer, trace):
         return AgentLoop(
             llm=llm,
             executor=executor or MCPToolExecutor(server, timeout=5),
-            writer=write_executor or MCPToolExecutor(writer, timeout=5),
+            writer=write_executor or MCPToolExecutor.for_writes(writer, timeout=5),
             trace=trace,
             config=AgentConfig(**config),
             clock=clock,
