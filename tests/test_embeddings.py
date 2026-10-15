@@ -1,6 +1,7 @@
 """The embedding client, exercised against a local HTTP server.
 
-The server is real HTTP on a loopback port, scripted per test. That exercises
+The server (`conftest.ScriptedAPI`) is real HTTP on a loopback port, scripted
+per test. That exercises
 the request the client actually puts on the wire and the parsing it actually
 does, without a network dependency or an API key. Nothing here is in the eval
 path: `evals/` always talks to the real endpoint.
@@ -8,72 +9,13 @@ path: `evals/` always talks to the real endpoint.
 
 from __future__ import annotations
 
-import json
-import threading
-import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-
 import pytest
 
 from src.tools.embeddings import EmbeddingError, OpenAIEmbedder
 from src.tools.errors import ToolError
+from tests.conftest import ScriptedAPI
 
 API_KEY = "sk-test-not-a-real-key"
-
-
-class ScriptedAPI:
-    """Replays `(status, body, delay)` per request and records what it got."""
-
-    def __init__(self) -> None:
-        self.script: list[tuple[int, object, float]] = []
-        self.requests: list[dict] = []
-        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
-        self._thread = threading.Thread(
-            target=self._server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
-        )
-
-    @property
-    def base_url(self) -> str:
-        host, port = self._server.server_address
-        return f"http://{host}:{port}/v1"
-
-    def _handler(self):
-        api = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def do_POST(self) -> None:  # noqa: N802 - stdlib naming
-                length = int(self.headers.get("Content-Length", 0))
-                api.requests.append(
-                    {
-                        "path": self.path,
-                        "authorization": self.headers.get("Authorization"),
-                        "body": json.loads(self.rfile.read(length)),
-                    }
-                )
-                status, body, delay = api.script.pop(0)
-                if delay:
-                    time.sleep(delay)
-                raw = body if isinstance(body, bytes) else json.dumps(body).encode()
-                try:
-                    self.send_response(status)
-                    self.send_header("Content-Type", "application/json")
-                    self.send_header("Content-Length", str(len(raw)))
-                    self.end_headers()
-                    self.wfile.write(raw)
-                except (BrokenPipeError, ConnectionResetError):
-                    pass  # the client timed out and hung up; expected
-
-            def log_message(self, *args) -> None:
-                pass
-
-        return Handler
-
-    def start(self) -> None:
-        self._thread.start()
-
-    def stop(self) -> None:
-        self._server.shutdown()
-        self._server.server_close()
 
 
 def ok(vectors: list[list[float]], *, order: list[int] | None = None, tokens: int = 7):
@@ -88,14 +30,6 @@ def ok(vectors: list[list[float]], *, order: list[int] | None = None, tokens: in
         ],
         "usage": {"prompt_tokens": tokens, "total_tokens": tokens},
     }
-
-
-@pytest.fixture
-def api():
-    server = ScriptedAPI()
-    server.start()
-    yield server
-    server.stop()
 
 
 @pytest.fixture

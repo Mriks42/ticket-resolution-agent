@@ -1,5 +1,8 @@
 """Shared fixtures.
 
+`api` is a scripted HTTP server on a loopback port, for testing provider
+clients against the bytes they really send and receive.
+
 `pg` gives a test its own Postgres schema, dropped afterwards, so tests never
 read or write the tables a dev run or an eval run uses. Tests that need it are
 skipped, with the reason shown, when Postgres is not reachable — they need
@@ -9,10 +12,14 @@ skipped, with the reason shown, when Postgres is not reachable — they need
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import os
 import re
+import threading
+import time
 import uuid
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
@@ -87,3 +94,66 @@ class HashingEmbedder:
 @pytest.fixture
 def hashing_embedder() -> HashingEmbedder:
     return HashingEmbedder()
+
+
+class ScriptedAPI:
+    """Replays `(status, body, delay)` per request and records what it got."""
+
+    def __init__(self) -> None:
+        self.script: list[tuple[int, object, float]] = []
+        self.requests: list[dict] = []
+        self._server = ThreadingHTTPServer(("127.0.0.1", 0), self._handler())
+        self._thread = threading.Thread(
+            target=self._server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True
+        )
+
+    @property
+    def base_url(self) -> str:
+        host, port = self._server.server_address
+        return f"http://{host}:{port}/v1"
+
+    def _handler(self):
+        api = self
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self) -> None:  # noqa: N802 - stdlib naming
+                length = int(self.headers.get("Content-Length", 0))
+                api.requests.append(
+                    {
+                        "path": self.path,
+                        "authorization": self.headers.get("Authorization"),
+                        "body": json.loads(self.rfile.read(length)),
+                    }
+                )
+                status, body, delay = api.script.pop(0)
+                if delay:
+                    time.sleep(delay)
+                raw = body if isinstance(body, bytes) else json.dumps(body).encode()
+                try:
+                    self.send_response(status)
+                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Length", str(len(raw)))
+                    self.end_headers()
+                    self.wfile.write(raw)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # the client timed out and hung up; expected
+
+            def log_message(self, *args) -> None:
+                pass
+
+        return Handler
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def stop(self) -> None:
+        self._server.shutdown()
+        self._server.server_close()
+
+
+@pytest.fixture
+def api():
+    server = ScriptedAPI()
+    server.start()
+    yield server
+    server.stop()

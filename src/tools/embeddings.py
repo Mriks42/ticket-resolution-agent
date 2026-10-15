@@ -13,8 +13,8 @@ every eval report because rankings under different models are not comparable
 Failure behaviour follows CLAUDE.md:
 
 - **Retries** use exponential backoff with a cap, and only for failures that
-  can plausibly clear on their own: rate limits, 5xx, timeouts, dropped
-  connections. A 4xx is the request's fault and is raised at once.
+  can plausibly clear on their own; a 4xx is raised at once. The policy lives
+  in `src/httpjson.py`, shared with the LLM client.
 - **Malformed output is an error, never a best effort.** A vector of the wrong
   length or attached to the wrong index, once stored, silently corrupts every
   ranking that touches it.
@@ -26,14 +26,11 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 import time
-import urllib.error
-import urllib.request
 from collections.abc import Callable, Sequence
-from http.client import HTTPException
 from typing import Any, Protocol
 
+from src.httpjson import HTTPRejected, HTTPRetriesExhausted, RetryPolicy, post_json
 from src.tools.errors import ToolError
 
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -45,8 +42,6 @@ KNOWN_DIMS = {
 }
 
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
-
-_RETRYABLE_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
 
 class EmbeddingError(ToolError):
@@ -98,9 +93,7 @@ class OpenAIEmbedder:
         self._url = base_url.rstrip("/") + "/embeddings"
         self._timeout = timeout
         self._batch_size = batch_size
-        self._max_attempts = max_attempts
-        self._backoff_base = backoff_base
-        self._backoff_cap = backoff_cap
+        self._retry = RetryPolicy(max_attempts, backoff_base, backoff_cap)
         self._sleep = sleep
 
         #: Cumulative, for cost reporting. Tokens are as the provider counted them.
@@ -117,46 +110,25 @@ class OpenAIEmbedder:
     # --- one request -----------------------------------------------------
 
     def _embed_batch(self, batch: list[str]) -> list[list[float]]:
-        payload = json.dumps({"model": self.model, "input": batch}).encode("utf-8")
-        last_failure = ""
-        for attempt in range(self._max_attempts):
-            if attempt:
-                self._sleep(min(self._backoff_cap, self._backoff_base * 2 ** (attempt - 1)))
-            self.requests_made += 1
-            request = urllib.request.Request(
-                self._url,
-                data=payload,
-                method="POST",
-                headers={
-                    "Authorization": f"Bearer {self._key}",
-                    "Content-Type": "application/json",
-                },
-            )
-            try:
-                with urllib.request.urlopen(request, timeout=self._timeout) as response:
-                    raw = response.read()
-            except urllib.error.HTTPError as exc:
-                last_failure = f"HTTP {exc.code}: {self._provider_message(exc)}"
-                if exc.code not in _RETRYABLE_STATUS:
-                    raise EmbeddingError(f"embeddings request rejected, {last_failure}") from None
-                continue
-            except (urllib.error.URLError, socket.timeout, ConnectionError, HTTPException) as exc:
-                reason = getattr(exc, "reason", exc)
-                last_failure = f"{type(reason).__name__}: {reason}"
-                continue
-            return self._parse(raw, len(batch))
-
-        raise EmbeddingError(
-            f"embeddings request failed after {self._max_attempts} attempts, "
-            f"last error {last_failure}"
-        )
-
-    def _provider_message(self, exc: urllib.error.HTTPError) -> str:
         try:
-            message = json.loads(exc.read())["error"]["message"]
-        except Exception:
-            message = exc.reason or "no detail"
-        return str(message).replace(self._key, "[redacted]")[:300]
+            raw = post_json(
+                self._url,
+                {"model": self.model, "input": batch},
+                headers={"Authorization": f"Bearer {self._key}"},
+                timeout=self._timeout,
+                policy=self._retry,
+                sleep=self._sleep,
+                redact=(self._key,),
+                on_attempt=self._count_request,
+            )
+        except HTTPRejected as exc:
+            raise EmbeddingError(f"embeddings request rejected, {exc}") from None
+        except HTTPRetriesExhausted as exc:
+            raise EmbeddingError(f"embeddings request {exc}") from None
+        return self._parse(raw, len(batch))
+
+    def _count_request(self) -> None:
+        self.requests_made += 1
 
     def _parse(self, raw: bytes, expected: int) -> list[list[float]]:
         try:
