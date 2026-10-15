@@ -1,0 +1,23 @@
+{
+  "reviewed": false,
+  "note": "Queries no policy clause answers. The correct retrieve_policy result for each is an empty list. Used by evals/retrieval_baseline.py to measure whether a backend can express 'nothing relevant', and to calibrate the dense similarity floor. Drafted by the assistant; set reviewed to true only after a human has checked every probe against the corpus. Three tiers, easiest first: nonsense, off-domain, and in-product questions outside billing/plan/account policy. The last tier is the one that matters - it is what a real support inbox sends. Probes deliberately avoid the few product features the corpus does mention (API access, SSO, storage, project limits, audit log, export), so none of them has a genuinely relevant clause.",
+  "review_notes": "Assistant evidence pass, 2026-10-14 (not a human review; reviewed stays false until the label owner signs off). Each probe's top-3 dense and top-2 lexical clauses were read against the query: every hit is a coincidental word match (Monday -> SLA-001.4, change -> PLN-001.5, adding -> SEA-001.4) or a weak semantic neighbour (due-date reminder -> BIL-001.5 renewal notice). None answers its probe. One interpretive point for the reviewer: ESC-001.6 ('where policy is silent ... escalate') applies to every probe, but by the absence of any other matching clause, not by similarity to the query. The empty result is what licenses ESC-001.6, so empty remains the correct retrieval answer; an agent escalating on silence should fetch ESC-001.6 by id. If the reviewer disagrees, these labels change.",
+  "probes": [
+    {"probe_id": "P-01", "tier": "nonsense", "query": "zzzqqx nonexistent kumquat protocol"},
+    {"probe_id": "P-02", "tier": "nonsense", "query": "asdf jkl qwerty"},
+    {"probe_id": "P-03", "tier": "off_domain", "query": "what's a good recipe for banana bread"},
+    {"probe_id": "P-04", "tier": "off_domain", "query": "who won the world cup in 2018"},
+    {"probe_id": "P-05", "tier": "off_domain", "query": "my car makes a grinding noise when I brake"},
+    {"probe_id": "P-06", "tier": "off_domain", "query": "translate good morning into french"},
+    {"probe_id": "P-07", "tier": "in_product", "query": "How do I make a task repeat every Monday?"},
+    {"probe_id": "P-08", "tier": "in_product", "query": "gantt view just shows a spinner and never loads"},
+    {"probe_id": "P-09", "tier": "in_product", "query": "can I change the colour of a column on the board"},
+    {"probe_id": "P-10", "tier": "in_product", "query": "Is there a keyboard shortcut for adding a subtask?"},
+    {"probe_id": "P-11", "tier": "in_product", "query": "how do i get task updates posted into our slack channel"},
+    {"probe_id": "P-12", "tier": "in_product", "query": "app crashes on my phone whenever i open a board with images on it"},
+    {"probe_id": "P-13", "tier": "in_product", "query": "How do I @mention someone in a comment so they get notified?"},
+    {"probe_id": "P-14", "tier": "in_product", "query": "can you guys add a dark mode pls"},
+    {"probe_id": "P-15", "tier": "in_product", "query": "drag and drop between boards stopped working after the update"},
+    {"probe_id": "P-16", "tier": "in_product", "query": "Is there a way to get a due-date reminder the day before a task is due?"}
+  ]
+}

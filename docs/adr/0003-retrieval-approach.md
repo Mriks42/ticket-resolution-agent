@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Accepted. Measured and partly corrected by ADR 0004: dense landed as the
+configured backend, hybrid was not adopted, and the premise that the floor
+could be calibrated to make the gap tickets return empty does not hold.
 
 ## Context
 

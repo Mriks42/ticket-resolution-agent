@@ -1,12 +1,13 @@
 """Deterministic TF-IDF scoring over a small document set.
 
-This is the retrieval backend for `retrieve_policy` and `search_past_tickets`
-until pgvector lands. It is lexical, not semantic: it matches words, and a
-query that paraphrases a clause without sharing vocabulary with it will miss.
-That limitation is real and belongs in the eval numbers rather than being
-papered over — a miss must surface as an empty result, so the retrieval
-guardrail and the "retrieval returns nothing relevant" failure case both have
-something honest to fire on.
+The backend for `search_past_tickets`, and the zero-dependency baseline for
+`retrieve_policy` that every other backend is measured against (ADR 0004
+moved the configured policy backend to dense). It is lexical, not semantic: it
+matches words, and a query that paraphrases a clause without sharing
+vocabulary with it will miss. A document sharing no word with the query is not
+returned — though ADR 0004 measured that this yields an empty result far less
+often than ADR 0003 assumed, since real queries nearly always share a word
+with something.
 
 Two properties matter downstream:
 
