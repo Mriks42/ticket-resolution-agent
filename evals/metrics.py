@@ -13,7 +13,7 @@ import random
 from dataclasses import dataclass
 from typing import Callable
 
-from evals.schema import AgentResult, Outcome, Ticket
+from evals.schema import AgentResult, Outcome, Ticket, Tool
 
 Contribution = tuple[float, float]
 MetricFn = Callable[[Ticket, AgentResult], Contribution]
@@ -85,6 +85,13 @@ def _pending_approval_rate(ticket: Ticket, result: AgentResult) -> Contribution:
     return (1.0 if result.outcome is Outcome.PENDING_APPROVAL else 0.0, 1.0)
 
 
+def _hallucinated_policy_rate(ticket: Ticket, result: AgentResult) -> Contribution:
+    drafted = any(call.tool is Tool.SEND_REPLY for call in result.tool_calls)
+    if not drafted:
+        return (0.0, 0.0)
+    return (1.0 if result.policy_violations else 0.0, 1.0)
+
+
 METRICS: dict[str, tuple[MetricFn, str]] = {
     "resolution_rate": (
         _resolution_rate,
@@ -109,6 +116,15 @@ METRICS: dict[str, tuple[MetricFn, str]] = {
         "A rate, not a precision: it says how often the agent asked for "
         "approval, not whether it was right to. Compare against the gold "
         "pending_approval share printed with the label distribution.",
+    ),
+    "hallucinated_policy_rate": (
+        _hallucinated_policy_rate,
+        "Drafted replies with at least one policy fact the deterministic "
+        "guardrail could not ground (ADR 0007), over drafted replies. A "
+        "flagged reply counts whether it was blocked or sent. It sees "
+        "amounts, durations, counts, percentages and clause citations only: "
+        "a wrong claim with no number in it is invisible here, so read this "
+        "beside the guardrail's recall from evals.guardrail_eval.",
     ),
 }
 

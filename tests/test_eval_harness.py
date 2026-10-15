@@ -224,3 +224,40 @@ def test_bootstrap_is_seed_deterministic() -> None:
     assert bootstrap_ci(pairs, resamples=500, seed=1) != bootstrap_ci(
         pairs, resamples=500, seed=2
     )
+
+
+class TwoRepliesAgent:
+    """Drafts a reply on T-001 (flagged by the guardrail) and T-002 (clean),
+    and escalates everything else without one."""
+
+    name = "two-replies"
+
+    async def run(self, ticket: Ticket) -> AgentResult:
+        if ticket.ticket_id in ("T-001", "T-002"):
+            flagged = ticket.ticket_id == "T-001"
+            return AgentResult(
+                ticket_id=ticket.ticket_id,
+                run_id=f"tr-{uuid4().hex[:8]}",
+                outcome=Outcome.ESCALATE if flagged else Outcome.RESOLVE,
+                tool_calls=[ToolCall(tool=Tool.SEND_REPLY)],
+                policy_violations=["unsupported_fact: '$15' is in no passage"] if flagged else [],
+            )
+        return AgentResult(
+            ticket_id=ticket.ticket_id, run_id=f"tr-{uuid4().hex[:8]}", outcome=Outcome.ESCALATE,
+        )
+
+
+def test_hallucinated_policy_rate_is_flagged_replies_over_drafted_replies(
+    tickets: list[Ticket],
+) -> None:
+    """Counted over drafted replies, flagged or not, blocked or not: in block
+    mode the flagged reply never went out, but it was still drafted."""
+    rate = score(TwoRepliesAgent(), tickets)["hallucinated_policy_rate"]
+    assert (rate.numerator, rate.denominator) == (1.0, 2.0)
+    assert rate.value == 0.5
+
+
+def test_hallucinated_policy_rate_is_undefined_without_replies(tickets: list[Ticket]) -> None:
+    rate = score(AlwaysEscalateAgent(), tickets)["hallucinated_policy_rate"]
+    assert rate.denominator == 0
+    assert rate.value is None

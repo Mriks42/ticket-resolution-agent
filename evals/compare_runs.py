@@ -45,12 +45,16 @@ def load(pairs: list[str]) -> dict[str, list[dict]]:
 
 
 def metric_table(configs: dict[str, list[dict]]) -> list[str]:
-    names = [m["name"] for m in next(iter(configs.values()))[0]["metrics"]]
+    # Every metric any report carries, in first-seen order. Reports from
+    # before a metric existed show n/a for it rather than hiding the metric.
+    names = list(dict.fromkeys(m["name"] for rs in configs.values() for r in rs for m in r["metrics"]))
     lines = ["", "metric values per run, and the mean across runs (not a CI)", ""]
     for name in names:
         lines.append(f"  {name}")
         for label, reports in configs.items():
-            values = [next(m for m in r["metrics"] if m["name"] == name)["value"] for r in reports]
+            values = [
+                next((m["value"] for m in r["metrics"] if m["name"] == name), None) for r in reports
+            ]
             shown = [v for v in values if v is not None]
             runs = "  ".join("  n/a" if v is None else f"{v:.3f}" for v in values)
             mean = f"{statistics.fmean(shown):.3f}" if shown else "n/a"
@@ -99,6 +103,9 @@ def trace_summary(configs: dict[str, list[dict]], trace_path: Path) -> list[str]
         events = [e for rid in run_ids for e in by_run.get(rid, [])]
         missing = sum(1 for rid in run_ids if rid not in by_run)
         gate = Counter(f"{e['tool']}:{e['verdict']}:{e['rule']}" for e in events if e["event"] == "gate")
+        checks = [e for e in events if e["event"] == "guardrail"]
+        flagged = [e for e in checks if e["violations"]]
+        kinds = Counter(f"{e['tool']}:{v['kind']}" for e in flagged for v in e["violations"])
         filed = Counter(e["filed_by"] for e in events if e["event"] == "escalation_filed")
         cost = [e["cost_usd"] for e in events if e["event"] == "run_finished"]
         lines.append(f"  {label}: {len(reports)} runs, {len(run_ids)} tickets"
@@ -107,6 +114,11 @@ def trace_summary(configs: dict[str, list[dict]], trace_path: Path) -> list[str]
             lines.append(f"    LLM cost      ${sum(cost):.4f} total, ${sum(cost) / len(reports):.4f} per run")
         if filed:
             lines.append("    escalations   " + ", ".join(f"filed by {k} {v}" for k, v in sorted(filed.items())))
+        if checks:
+            modes = ", ".join(sorted({e["mode"] for e in checks}))
+            lines.append(f"    guardrail     {len(flagged)} of {len(checks)} checks flagged (mode {modes})")
+            for key, n in sorted(kinds.items()):
+                lines.append(f"    violations    {key:<44} {n}")
         for key, n in sorted(gate.items()):
             lines.append(f"    gate          {key:<44} {n}")
         refunds = defaultdict(list)
