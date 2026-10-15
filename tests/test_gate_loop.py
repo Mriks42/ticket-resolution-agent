@@ -91,6 +91,19 @@ async def test_a_finance_band_refund_names_finance(make, owner_ticket) -> None:
 
 
 @pytest.mark.asyncio
+async def test_refunds_are_banded_on_the_ticket_total(make, owner_ticket, ctx, trace) -> None:
+    """$30 is self-serve; a further $25 on the same ticket is not."""
+    llm = ScriptedLLM(refund(owner_ticket, 30), refund(owner_ticket, 25), reply(owner_ticket))
+    result = await make(llm).run(owner_ticket)
+
+    assert result.final_state == "PENDING_APPROVAL"
+    assert [r["amount"] for r in ctx.store.records("refunds")] == [30.0]
+    assert json.loads(llm.last_observation(2))["approver"] == "support manager"
+    decisions = [e for e in gate_events(trace, result.run_id) if e["tool"] == "issue_refund"]
+    assert [d["facts"]["refunded_before"] for d in decisions] == [0, 30]
+
+
+@pytest.mark.asyncio
 async def test_writes_go_through_the_write_server_only(make, owner_ticket, server) -> None:
     llm = ScriptedLLM(refund(owner_ticket, 20), reply(owner_ticket))
     result = await make(llm).run(owner_ticket)
@@ -230,3 +243,4 @@ async def test_a_reply_that_cannot_be_sent_escalates(make, owner_ticket, ctx) ->
     result = await make(llm, write_executor=broken).run(owner_ticket)
     assert result.final_state == "ESCALATE"
     assert "could not be sent" in result.stop_reason
+

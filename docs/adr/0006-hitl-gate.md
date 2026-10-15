@@ -38,6 +38,11 @@ before any code was written:
 3. **A held refund, then an escalation (T-021).** **Decided: escalation
    wins.** The gate never overrides the model's choice to hand off; the held
    refund goes to the human with the escalation.
+4. **Is the USD 50 limit per refund or per ticket?** ESC-001.1 says "a refund
+   of up to USD 50". **Decided after the first measurement: per ticket.** The
+   bands apply to the running total of refunds on the ticket, so a refund cannot
+   be split into pieces that each look self-serve. See "Refunds are banded on
+   the ticket total" below.
 
 ## Decisions
 
@@ -48,13 +53,16 @@ before any code was written:
 | refund | requester is not the verified owner | ESC-001.4 | ESCALATE |
 | refund | owner cannot be looked up | ESC-001.4 | ESCALATE (fails closed) |
 | refund | reason cites an unretrieved clause | — | ESCALATE |
-| refund | ≤ USD 50 | ESC-001.1 | EXECUTE |
-| refund | USD 50.01–500 | ESC-001.2 | HOLD for a support manager |
-| refund | > USD 500 | ESC-001.3 | HOLD for finance |
+| refund | ticket total ≤ USD 50 | ESC-001.1 | EXECUTE |
+| refund | ticket total USD 50.01–500 | ESC-001.2 | HOLD for a support manager |
+| refund | ticket total > USD 500 | ESC-001.3 | HOLD for finance |
 | reply | cites an unretrieved clause | — | ESCALATE (hallucinated policy) |
 | reply | an approval is pending | — | HOLD with it |
 | reply | otherwise | — | EXECUTE → RESOLVE |
 | escalate | always | — | EXECUTE → ESCALATE |
+
+"Ticket total" is this refund plus every earlier refund on the ticket that
+executed or is held. A refund that failed to execute does not count.
 
 The band thresholds are policy copied into code. A test reads ESC-001.1–.3
 from the corpus and fails if the text and the constants disagree.
@@ -182,14 +190,21 @@ not answerable from five runs.
 - `AgentLoop` requires a `writer`; anything constructing one must supply the
   write-scoped executor.
 
+## Refunds are banded on the ticket total
+
+The first measurement found the gap. In one run the model refunded exactly
+$50 on T-021, a $176 charge, and the per-refund gate executed it; nothing would
+have stopped $50 + $49 on the same ticket. The label owner decided ESC-001.1's
+limit is per ticket. The gate now bands the running total, and each gate
+decision records `refunded_before` in its facts.
+
+**This changes no measured outcome above.** In the three gated runs, no ticket
+proposed more than one refund (0 of 66, from the trace), so per-refund and
+per-ticket banding decide identically on every one. The runs were not
+repeated.
+
 ## Open
 
-- **Refunds are banded one at a time.** In one run the model refunded exactly
-  $50 on T-021, a $176 charge, and the gate executed it, because the gate judges
-  each refund in isolation. Nothing stops $50 + $49 on one ticket. Banding the
-  *cumulative* refund per ticket would close this. That is a reading of ESC-001.1
-  ("a refund of up to USD 50"), so it is the label owner's call, and it is the
-  first thing to decide next.
 - **Over-escalation of dispositive declines** (T-008, T-019, T-020) and the
   executed-refund misreading on T-004 are prompt and behaviour work, for the
   Session 8 synthetic set, not these 22.

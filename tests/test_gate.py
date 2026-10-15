@@ -24,9 +24,10 @@ from src.tools.policy import load_clauses
 OWNER = "r.mehta@brightfold.example"
 
 
-def refund(amount, *, requester=OWNER, owner=OWNER, cited=(), retrieved=()):
+def refund(amount, *, already=0, requester=OWNER, owner=OWNER, cited=(), retrieved=()):
     return decide_refund(
         amount=amount,
+        already_refunded=already,
         requester_email=requester,
         owner_email=owner,
         cited=set(cited),
@@ -66,6 +67,27 @@ def test_band_thresholds_are_the_ones_the_policy_states() -> None:
         f"and USD {int(MANAGER_REFUND_MAX)}"
     ) in text["ESC-001.2"]
     assert f"above USD {int(MANAGER_REFUND_MAX)}" in text["ESC-001.3"]
+
+
+def test_bands_apply_to_the_total_refunded_on_the_ticket() -> None:
+    """Decided with the label owner: ESC-001.1's limit is per ticket, so a
+    refund cannot be split into pieces that each look self-serve."""
+    assert refund(30).verdict is Verdict.EXECUTE
+    second = refund(25, already=30)
+    assert second.verdict is Verdict.HOLD
+    assert second.clause == "ESC-001.2"
+    assert "55.00" in second.detail
+
+
+def test_split_refunds_cannot_add_up_past_the_self_serve_limit() -> None:
+    assert refund(50, already=0).verdict is Verdict.EXECUTE
+    assert refund(0.01, already=50).verdict is Verdict.HOLD
+
+
+def test_the_total_can_cross_into_the_finance_band() -> None:
+    decision = refund(300, already=300)
+    assert decision.clause == "ESC-001.3"
+    assert decision.approver == "finance"
 
 
 def test_amounts_are_compared_in_cents() -> None:

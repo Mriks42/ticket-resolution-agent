@@ -164,6 +164,8 @@ class _Run:
     retrieved: set[str] = field(default_factory=set)
     #: Gated actions waiting for an approver.
     held: list[dict] = field(default_factory=list)
+    #: Refunds on this ticket so far, executed or held. The gate bands the total.
+    refunded: float = 0.0
     escalation_filed: bool = False
     owner_email: str | None = None
     owner_checked: bool = False
@@ -379,9 +381,14 @@ class AgentLoop:
         facts: dict = {}
         if call.name == "issue_refund":
             owner = await self._owner_email(run)
-            facts = {"requester_email": run.ticket.requester_email, "owner_verified": owner is not None}
+            facts = {
+                "requester_email": run.ticket.requester_email,
+                "owner_verified": owner is not None,
+                "refunded_before": run.refunded,
+            }
             decision = decide_refund(
                 amount=args["amount"],
+                already_refunded=run.refunded,
                 requester_email=run.ticket.requester_email,
                 owner_email=owner,
                 cited=cited_clause_ids(str(args.get("reason", ""))),
@@ -409,6 +416,7 @@ class AgentLoop:
                 "tool": call.name, "args": args,
                 "approver": decision.approver, "clause": decision.clause,
             })
+            run.refunded += args["amount"]
             content = json.dumps({
                 "status": "pending_approval",
                 "approver": decision.approver,
@@ -427,6 +435,8 @@ class AgentLoop:
                     run, State.ESCALATE, f"the reply could not be sent ({obs.status}: {obs.message})"
                 )
             return self._go(run, State.RESOLVE, "reply sent")
+        if call.name == "issue_refund" and obs.status == "ok":
+            run.refunded += args["amount"]
         content = obs.for_model()
         if obs.status == "ok" and decision.clause:
             content = json.dumps({**obs.payload, "policy": self._show_clause(run, decision.clause)})

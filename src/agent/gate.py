@@ -19,8 +19,11 @@ The rules, in the order they are applied:
 **Refunds.** (1) Owner check, ESC-001.4: a refund for anyone other than the
 verified account owner escalates, whatever the amount. An owner the gate cannot
 verify fails closed. (2) Coverage: a refund reason citing a clause that was
-not retrieved escalates. (3) Band, ESC-001.1–.3: up to USD 50 executes, up to
-USD 500 waits for a support manager, above that for finance.
+not retrieved escalates. (3) Band, ESC-001.1–.3, applied to the ticket's
+running total (refunds already executed or held, plus this one): up to USD 50
+executes, up to USD 500 waits for a support manager, above that for finance.
+Banding the total rather than each refund means a refund cannot be split into
+pieces that each look self-serve; ADR 0006 records the decision.
 
 **Replies.** (1) Coverage: a reply citing a clause that was not retrieved in
 this run is a hallucinated-policy event and escalates. (2) If an approval is
@@ -74,6 +77,7 @@ def cited_clause_ids(text: str) -> set[str]:
 def decide_refund(
     *,
     amount: float,
+    already_refunded: float,
     requester_email: str,
     owner_email: str | None,
     cited: set[str],
@@ -96,22 +100,24 @@ def decide_refund(
     if uncovered:
         return uncovered
 
-    cents = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    if cents <= SELF_SERVE_REFUND_MAX:
+    cents = _cents(amount)
+    total = _cents(already_refunded) + cents
+    on_ticket = f"USD {cents}, bringing this ticket's refunds to USD {total},"
+    if total <= SELF_SERVE_REFUND_MAX:
         return Decision(
             Verdict.EXECUTE, "refund_band",
-            f"USD {cents} is within the USD {SELF_SERVE_REFUND_MAX} self-serve limit",
+            f"{on_ticket} is within the USD {SELF_SERVE_REFUND_MAX} self-serve limit",
             clause="ESC-001.1",
         )
-    if cents <= MANAGER_REFUND_MAX:
+    if total <= MANAGER_REFUND_MAX:
         return Decision(
             Verdict.HOLD, "refund_band",
-            f"USD {cents} needs support manager approval",
+            f"{on_ticket} needs support manager approval",
             clause="ESC-001.2", approver="support manager",
         )
     return Decision(
         Verdict.HOLD, "refund_band",
-        f"USD {cents} is above USD {MANAGER_REFUND_MAX} and needs finance approval",
+        f"{on_ticket} is above USD {MANAGER_REFUND_MAX} and needs finance approval",
         clause="ESC-001.3", approver="finance",
     )
 
@@ -136,6 +142,10 @@ def _uncovered(cited: set[str], retrieved: set[str]) -> Decision | None:
         Verdict.ESCALATE, "citation_not_retrieved",
         f"cites {', '.join(missing)}, which no retrieval in this run returned",
     )
+
+
+def _cents(amount: float) -> Decimal:
+    return Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _normal(email: str) -> str:
