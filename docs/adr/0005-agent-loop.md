@@ -3,7 +3,9 @@
 ## Status
 
 Accepted. The numbers below are the loop *without* the HITL gate or the
-guardrail, which come next, and they read accordingly.
+guardrail, which come next, and they read accordingly. Holding every gated call
+unconditionally is superseded by the gate in ADR 0006; everything else here
+stands.
 
 ## Context
 
