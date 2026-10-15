@@ -5,6 +5,7 @@ description = "Add your description here"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.141.1",
+    "psycopg[binary]>=3.3.6",
     "pydantic>=2.13.4",
     "uvicorn>=0.52.4",
 ]

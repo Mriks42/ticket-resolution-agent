@@ -1,0 +1,30 @@
+# Local Postgres + pgvector for retrieval (and, later, the memory layer).
+#
+#     docker compose up -d
+#
+# The schema is not mounted here: `src/tools/vectorstore.py` applies it
+# idempotently on connect, so the code and the tables cannot drift apart.
+#
+# Credentials are local-only and match DATABASE_URL in .env.example. The image
+# is pinned to an exact pgvector release because rankings are part of the eval
+# record, and a silent extension upgrade is a change to the retriever.
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      POSTGRES_USER: tra
+      POSTGRES_PASSWORD: tra
+      POSTGRES_DB: ticket_agent
+    ports:
+      - "${TRA_PG_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tra -d ticket_agent"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+volumes:
+  pgdata:
