@@ -125,6 +125,12 @@ class AgentResult(BaseModel):
     outcome: Outcome
     tool_calls: list[ToolCall] = []
     cited_policy_ids: list[str] = []
+    #: The loop's terminal state. Distinct from `outcome` in one case: FAILED
+    #: (no usable completion from the model) is reported as an escalation,
+    #: since the ticket still has to reach a human, but must stay countable.
+    final_state: str | None = None
+    #: Why the run stopped, in words. Set when the loop, not the model, ended it.
+    stop_reason: str | None = None
 
 
 @runtime_checkable
