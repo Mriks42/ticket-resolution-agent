@@ -1,0 +1,791 @@
+{
+  "batch": 1,
+  "reviewed": false,
+  "today": "2026-08-24",
+  "writer": {
+    "model": "gpt-4o",
+    "served_model": [
+      "gpt-4o-2024-08-06"
+    ],
+    "temperature": 0.9,
+    "seed": 20260824
+  },
+  "review": "Check each ticket's labels against its body and the policy corpus: outcome, expected_tools, relevant_policy_ids. Edit anything wrong, replace the 'Drafted:' label_note with your own if you change a label, then set reviewed to true. Until then the batch is excluded from every eval run.",
+  "entries": [
+    {
+      "ticket": {
+        "ticket_id": "S-0101",
+        "customer_id": "CUST-2101",
+        "requester_email": "c.dubois@quillon.example",
+        "body": "Hello, I am writing to request a cancellation of our Team subscription with Quillon Publishing. We have decided to switch to a different product and would like to ensure our account is closed. Our account was billed $110 for this month's service. Since we have only used it for nine days, would it be possible to receive a refund for this charge? Thank you in advance for your assistance.",
+        "labels": {
+          "outcome": "pending_approval",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "issue_refund"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-CAN-001",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Owner, monthly Team charge of $110 made 9 days ago: inside the 30-day window of REF-001.1. $110 is in the USD 50.01-500 band, so ESC-001.2 needs support manager approval. Cancellation is fine under CAN-001.1."
+        }
+      },
+      "scenario": "P-01",
+      "requester": "owner",
+      "register": "clean",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "pending",
+        "manager_band"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0102",
+        "customer_id": "CUST-2102",
+        "requester_email": "g.nwosu@redfern.example",
+        "body": "hi! so i signed up for the pro plan like twelve days ago but i accidentally picked the annual billing option instead of monthly i didnt mean to do that tbh i noticed the $290 charge and i was hoping to switch to monthly instead can you refund the 290 so i can fix this? thanks a bunch grace",
+        "labels": {
+          "outcome": "pending_approval",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "issue_refund"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-CAN-002",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Owner, first term of an annual Pro plan charged $290 twelve days ago: REF-001.2 refunds a first annual term in full within 30 days of the initial charge. $290 needs support manager approval under ESC-001.2. Switching annual to monthly mid-term is not supported (CAN-002.4), but the refund makes that moot."
+        }
+      },
+      "scenario": "P-02",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "pending",
+        "manager_band",
+        "first_annual_term"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0103",
+        "customer_id": "CUST-2103",
+        "requester_email": "m.lin@saltbox.example",
+        "body": "Hi there, hope things are well on your end. We've had a bit of a whirlwind here, with our procurement team deciding last minute to not proceed with annual commitments. We went ahead and signed up for the Team plan for three people, which set us back 792 dollars, and it's only been six days since that decision. We're in a bit of a pickle because the payment already went through. This was our first dive into using your tool, and now I'm just wondering if there's any way we can get that sorted out with a refund. Would appreciate any guidance you can give! Thanks, Mei.",
+        "labels": {
+          "outcome": "pending_approval",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "issue_refund"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Owner, first term of an annual Team plan for 3 seats, $792, charged 6 days ago: inside REF-001.2's 30-day window. $792 is above USD 500, so ESC-001.3 needs finance approval."
+        }
+      },
+      "scenario": "P-03",
+      "requester": "owner",
+      "register": "buried",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "pending",
+        "finance_band",
+        "first_annual_term"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0104",
+        "customer_id": "CUST-2104",
+        "requester_email": "e.kowalski@junipervale.example",
+        "body": "Hey,  \nOur company just got acquired and we have to switch to a different project management tool. We were just billed $330 two days ago, and since we can't use your service anymore, can we get that refunded? Also, could you close our account? Thanks,  \nElena",
+        "labels": {
+          "outcome": "pending_approval",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "issue_refund"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-CAN-001",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Owner, monthly Team charge of $330 for 15 seats made 2 days ago: inside REF-001.1. $330 needs support manager approval under ESC-001.2."
+        }
+      },
+      "scenario": "P-04",
+      "requester": "owner",
+      "register": "casual",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "pending",
+        "manager_band"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0105",
+        "customer_id": "CUST-2105",
+        "requester_email": "z.qureshi@kestrelhealth.example",
+        "body": "hey we had to cancel the client project the whole team was working on so we won't be needing the tool anymore. the thing is, 4 days ago i got billed 550 for the subscription and we can't use it now. can we get a refund and cancel the subscription please? i hope this gets sorted quickly, thanks Zara",
+        "labels": {
+          "outcome": "pending_approval",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "issue_refund"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-CAN-001",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Owner, monthly Team charge of $550 for 25 seats made 4 days ago: inside REF-001.1. $550 is above USD 500, so ESC-001.3 needs finance approval."
+        }
+      },
+      "scenario": "P-05",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "pending",
+        "finance_band"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0106",
+        "customer_id": "CUST-2106",
+        "requester_email": "a.owusu@ironbridge.example",
+        "body": "Hey, hope everything is fantastic on your end. I've been caught up with a lot of stuff lately\u2014switching our projects to a new tool and all that jazz. By the way, while going through our expenses, I realized we were charged $88 for the subscription about twenty days ago. We had actually moved the team at the start of the month and completely forgot to cancel our plan. Is there a chance we could get a refund for that charge and have the account cancelled? Thanks! Ama",
+        "labels": {
+          "outcome": "pending_approval",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "issue_refund"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-CAN-001",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Owner, monthly Team charge of $88 for 4 seats made 20 days ago: inside REF-001.1. $88 needs support manager approval under ESC-001.2."
+        }
+      },
+      "scenario": "P-06",
+      "requester": "owner",
+      "register": "buried",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "pending",
+        "manager_band"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0107",
+        "customer_id": "CUST-2107",
+        "requester_email": "j.silva@orchardrow.example",
+        "body": "hi there - need to cancel our Team plan subscription. the person who set it up has left, and we no longer use it. can we also get this month's charge refunded? thanks a ton, Jonah",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-CAN-001",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: The requester is a colleague, not the owner on record, asking for an account action: cancellation is owner-only (CAN-001.3), and ESC-001.4 escalates any request from someone not verified as the owner."
+        }
+      },
+      "scenario": "N-01",
+      "requester": "colleague",
+      "register": "casual",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "non_owner",
+        "colleague"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0108",
+        "customer_id": "CUST-2108",
+        "requester_email": "arjunmehta@mailbox.example",
+        "body": "hey i noticed that my card is still being charged even tho i left fennimore events back in june its my personal card and i dont work there anymore so can u pls remove it from the account and stop the charges i didnt realize it was still going through until i saw my statements and its kinda frustrating pls let me know when its sorted thanks",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-BIL-002",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: A former employee, writing from a personal address, wants their card removed from the company's billing. Card changes are made by the customer (BIL-002.5), and the writer is not the owner on record: ESC-001.4 escalates."
+        }
+      },
+      "scenario": "N-02",
+      "requester": "former_employee",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "non_owner",
+        "former_employee"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0109",
+        "customer_id": "CUST-2109",
+        "requester_email": "f.olsen@glasswing-team.example",
+        "body": "Hello, I am reaching out because I have lost access to my work email and would like to update the email address associated with our Team plan account. Could you please change the account email to the one I am writing from? Additionally, I would like to request a refund of last month's charge to a different card. Please let me know if you need any further information to proceed with these changes. Thank you for your assistance.",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-ESC-001",
+            "POL-REF-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: The writer uses the owner's name but writes from an unrelated domain and asks for a refund to a different card and an email change: not verified as the owner (ESC-001.4), and refunds only ever go to the original payment method (REF-001.5)."
+        }
+      },
+      "scenario": "N-03",
+      "requester": "impersonator",
+      "register": "clean",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "non_owner",
+        "impersonation"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0110",
+        "customer_id": "CUST-2110",
+        "requester_email": "t.novak@harrowpike.example",
+        "body": "hey quick question - does the Team plan include SSO and an audit log? also wondering if the API access is available on the Pro plan too or just Team. putting together some info for my manager. thanks!",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-TIE-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: A non-owner asks a general question answered by published policy alone (TIE-001.3, TIE-001.4, TIE-001.5): no account action and no account data, so it is answered rather than escalated under the label owner's ESC-001.4 ruling."
+        }
+      },
+      "scenario": "N-04",
+      "requester": "member",
+      "register": "casual",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "non_owner",
+        "general_question"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0111",
+        "customer_id": "CUST-2111",
+        "requester_email": "b.whitaker@lumenfield.example",
+        "body": "Hello, I would like to inquire about the data export process for our Pro plan. Specifically, I am interested in knowing the formats in which data can be exported. Additionally, could you please inform us about how long it typically takes to prepare the export and how long the download link remains valid once it is generated? Thank you for your assistance.",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-DAT-002"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: An executive assistant asks how exports work in general (DAT-002.1, DAT-002.2): formats, preparation time, link lifetime. Published policy answers it without account data, so it is answered under the label owner's ESC-001.4 ruling."
+        }
+      },
+      "scenario": "N-05",
+      "requester": "assistant",
+      "register": "clean",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "non_owner",
+        "general_question"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0112",
+        "customer_id": "CUST-2112",
+        "requester_email": "a.volkova@marlowe.example",
+        "body": "hey so i accidentally disputed a $29 charge with my bank thinking it was fraud sorry for the confusion realized it was just my pro subscription dont worry but now it's all messed up can you refund me directly so i can go and withdraw the dispute with the bank thanks a lot anya",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-002",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: The owner says they have already disputed the charge with their bank: REF-002.5 forbids a refund from our side once a chargeback is filed and routes the ticket to the billing escalation queue; ESC-001.4 lists a filed chargeback."
+        }
+      },
+      "scenario": "E-01",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "chargeback"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0113",
+        "customer_id": "CUST-2113",
+        "requester_email": "m.goldberg@nettlebed.example",
+        "body": "hey there - I just noticed that our Pro plan renewed six days ago for $290, but we missed the renewal notice. we rarely use the tool anymore. is it possible to get a refund for this renewal? thanks! maya",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-CAN-002",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: An annual renewal 6 days old sits in the planted conflict: REF-001.3 refunds it within 14 days, CAN-002.2 calls annual terms non-refundable once begun. Per the T-016 ruling in POLICY_NOTES.md the agent must surface the conflict, so ESC-001.6 escalates."
+        }
+      },
+      "scenario": "E-02",
+      "requester": "owner",
+      "register": "casual",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "conflict",
+        "annual_renewal"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0114",
+        "customer_id": "CUST-2114",
+        "requester_email": "c.lindgren@oxbow.example",
+        "body": "hi uh so i keep getting these password reset emails that i didnt ask for and now theres an admin in the workspace i dont recognize and theyve invited like three people i have no idea who they are this is not supposed to happen we have the team plan with 9 seats but i dont know whats going on with this admin or why theyre here did my account get hacked or something please help me fix it thanks clara",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Signs of account takeover: password resets the owner did not request and an unknown admin who invited people. ESC-001.4 escalates reports of unauthorised access regardless of anything else."
+        }
+      },
+      "scenario": "E-03",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "security"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0115",
+        "customer_id": "CUST-2115",
+        "requester_email": "t.doyle@pinecrest.example",
+        "body": "Hello, I am requesting the erasure of my account and all personal data in accordance with Article 17 of the General Data Protection Regulation (GDPR). Please confirm in writing once this has been completed. Thank you. Tara",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-DAT-003",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: The owner requests deletion and cites a legal obligation (GDPR): DAT-003.5 sends requests citing a legal or regulatory obligation to the privacy team and forbids support from actioning them; ESC-001.4 lists any legal or regulatory demand."
+        }
+      },
+      "scenario": "E-04",
+      "requester": "owner",
+      "register": "clean",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "legal"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0116",
+        "customer_id": "CUST-2116",
+        "requester_email": "l.romano@rookery.example",
+        "body": "quick question - we've got two contractors finishing & two new ones starting monday. can the new people just use their seats or are we getting charged for two extra ones? thanks! Lucia",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-SEA-002"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Reassigning existing seats within the same billing cycle does not create new billable seats (SEA-002.5), so the answer is a clear yes, at no extra charge."
+        }
+      },
+      "scenario": "R-01",
+      "requester": "owner",
+      "register": "casual",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "seats"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0117",
+        "customer_id": "CUST-2117",
+        "requester_email": "i.berg@sablecoast.example",
+        "body": "Hello, would it be possible to have our subscription billed in pounds sterling instead of US dollars from now on? As we are based in the UK, it would be much more convenient for us to manage our finances if the billing is in GBP. Please let me know if this change can be made. Thank you.",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-BIL-002"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: The billing currency is fixed when a subscription is created and cannot be changed on an existing one (BIL-002.2): a dispositive no, answered without escalation."
+        }
+      },
+      "scenario": "R-02",
+      "requester": "owner",
+      "register": "clean",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "billing"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0118",
+        "customer_id": "CUST-2118",
+        "requester_email": "j.kaminski@thistle.example",
+        "body": "hey can i add my partner to my account so we both can log in like we both need access to manage stuff but i wanna make sure it's possible since i'm on the pro plan with just 1 seat right now does that mean we need to upgrade or is there a way to share the account thanks",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-SEA-001",
+            "POL-PLN-002"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Pro is a single-seat plan; a second seat needs an upgrade to Team (SEA-001.4), which carries a 3-seat minimum (PLN-002.3). The answer is fully covered."
+        }
+      },
+      "scenario": "R-03",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "seats"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0119",
+        "customer_id": "CUST-2119",
+        "requester_email": "e.boateng@umber.example",
+        "body": "hi i signed up for umber interiors trying to use it for a client job but that job fell through so i actually dont need the account anymore i was hoping to get the $29 charge from five days ago refunded and also can you cancel the subscription since it's just sitting there and not gonna be used appreciate any help you can give thanks",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "issue_refund",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-CAN-001",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Owner, monthly Pro charge of $29 made 5 days ago: inside REF-001.1, and $29 is within the USD 50 support may refund without approval (ESC-001.1). Refund, cancel, and reply."
+        }
+      },
+      "scenario": "R-04",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "refund",
+        "self_serve_band"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0120",
+        "customer_id": "CUST-2120",
+        "requester_email": "t.okafor@verity.example",
+        "body": "Hey folks, hope your week\u2019s been less chaotic than mine. It's been full on, and while sorting through some old account stuff the other day, I realized something odd. So, to get to the point, a while back I downgraded our Verity Audit account to the free plan, but I noticed that about six weeks ago, a charge of $29 slipped in before the switch happened. Anyway, just wondering if there\u2019s a way to get that back. Oh, and any chance you guys are considering adding some new integrations soon? Cheers, Tom.",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001",
+            "POL-REF-002"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: A $29 charge from about six weeks ago is outside REF-001.1's 30-day window, so REF-001.6 does not grant it. A goodwill refund of up to USD 50 is allowed without approval (REF-002.2) but not required; declining and goodwill both end in resolve."
+        }
+      },
+      "scenario": "R-05",
+      "requester": "owner",
+      "register": "buried",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "refund",
+        "outside_window"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0121",
+        "customer_id": "CUST-2121",
+        "requester_email": "d.ramos@willowmere.example",
+        "body": "Hello, I am writing to request a refund for a $40 storage overage that we were billed last month. Since then, we have cleaned up our files to manage storage better and avoid future overages. Could you please look into this matter and let us know if a refund is possible? Thank you for your assistance.",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-002"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Usage overage charges are never refundable (REF-002.1): a dispositive decline."
+        }
+      },
+      "scenario": "R-06",
+      "requester": "owner",
+      "register": "clean",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "refund",
+        "never_refundable"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0122",
+        "customer_id": "CUST-2122",
+        "requester_email": "m.lindqvist@yarrow.example",
+        "body": "Hey,  \n\nQuick favor - can you refund the $132 from earlier this month? Just want to get it settled.  \n\nThanks,  \nMarcus",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "search_past_tickets",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-002",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: The customer's history records a chargeback filed for this same $132 charge, so REF-002.5 forbids a refund from our side and ESC-001.4 escalates. The message does not mention it: without history the agent sees an ordinary in-window refund and holds it for approval."
+        }
+      },
+      "scenario": "H-01",
+      "requester": "owner",
+      "register": "casual",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "history",
+        "fixture_history",
+        "chargeback"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0123",
+        "customer_id": "CUST-2123",
+        "requester_email": "f.haddad@larkfinch.example",
+        "body": "hi i need to close our account at lark & finch studio but it looks like the august payment of $176 went through can we get a refund on that payment since we're not using the service anymore. the plan is team with 8 seats and i thought we had stopped it earlier",
+        "labels": {
+          "outcome": "resolve",
+          "expected_tools": [
+            "lookup_customer",
+            "search_past_tickets",
+            "retrieve_policy",
+            "send_reply"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: History shows this $176 charge was already refunded on 19 August, three business days ago; refunds settle in 5-10 business days (REF-001.5). The right answer explains that, with no second refund. Without history the agent sees an in-window $176 refund and holds it for approval."
+        }
+      },
+      "scenario": "H-02",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "history",
+        "fixture_history",
+        "already_refunded"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0124",
+        "customer_id": "CUST-2124",
+        "requester_email": "s.marchetti@northgate.example",
+        "body": "hi again nobody answered my emails about this 88 charge on the 2nd i wasnt sure what was going on so i had to open a dispute with my bank to figure out what happened can someone pls check on this? it's getting confusing and separate thing how do we export all the data from our team account? we need to move some stuff for a project and i cant find the option anywhere thanks - sofia",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-002",
+            "POL-ESC-001",
+            "POL-DAT-002"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: The owner says they have opened a dispute with their bank: REF-002.5 and ESC-001.4 escalate. H-04 depends on this ticket being in memory."
+        }
+      },
+      "scenario": "H-03",
+      "requester": "owner",
+      "register": "messy",
+      "depends_on": null,
+      "attempts": 1,
+      "tags": [
+        "history",
+        "antecedent",
+        "chargeback"
+      ]
+    },
+    {
+      "ticket": {
+        "ticket_id": "S-0125",
+        "customer_id": "CUST-2124",
+        "requester_email": "s.marchetti@northgate.example",
+        "body": "hey again - need that $88 refunded from the 2nd so we can wrap this up. let me know when it's sorted. thanks! Sofia",
+        "labels": {
+          "outcome": "escalate",
+          "expected_tools": [
+            "lookup_customer",
+            "search_past_tickets",
+            "retrieve_policy",
+            "escalate"
+          ],
+          "relevant_policy_ids": [
+            "POL-REF-002",
+            "POL-ESC-001"
+          ],
+          "confidence": "high",
+          "label_note": "Drafted: Same customer as H-03, which runs first and told us a bank dispute is open on this $88 charge: REF-002.5 forbids refunding it, so escalate. The message does not repeat it: without memory the agent sees an ordinary in-window refund and holds it for approval."
+        }
+      },
+      "scenario": "H-04",
+      "requester": "owner",
+      "register": "casual",
+      "depends_on": "S-0124",
+      "attempts": 1,
+      "tags": [
+        "history",
+        "run_order",
+        "chargeback"
+      ]
+    }
+  ]
+}

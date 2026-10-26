@@ -1,0 +1,280 @@
+{
+  "CUST-2101": {
+    "customer_id": "CUST-2101",
+    "owner_email": "c.dubois@quillon.example",
+    "plan": "team",
+    "seats": 5,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 110.0,
+    "last_charge_date": "2026-08-15",
+    "past_tickets": []
+  },
+  "CUST-2102": {
+    "customer_id": "CUST-2102",
+    "owner_email": "g.nwosu@redfern.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "annual",
+    "account_status": "active",
+    "last_charge_usd": 290.0,
+    "last_charge_date": "2026-08-12",
+    "past_tickets": []
+  },
+  "CUST-2103": {
+    "customer_id": "CUST-2103",
+    "owner_email": "m.lin@saltbox.example",
+    "plan": "team",
+    "seats": 3,
+    "billing_cycle": "annual",
+    "account_status": "active",
+    "last_charge_usd": 792.0,
+    "last_charge_date": "2026-08-18",
+    "past_tickets": []
+  },
+  "CUST-2104": {
+    "customer_id": "CUST-2104",
+    "owner_email": "e.kowalski@junipervale.example",
+    "plan": "team",
+    "seats": 15,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 330.0,
+    "last_charge_date": "2026-08-22",
+    "past_tickets": []
+  },
+  "CUST-2105": {
+    "customer_id": "CUST-2105",
+    "owner_email": "z.qureshi@kestrelhealth.example",
+    "plan": "team",
+    "seats": 25,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 550.0,
+    "last_charge_date": "2026-08-20",
+    "past_tickets": []
+  },
+  "CUST-2106": {
+    "customer_id": "CUST-2106",
+    "owner_email": "a.owusu@ironbridge.example",
+    "plan": "team",
+    "seats": 4,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 88.0,
+    "last_charge_date": "2026-08-04",
+    "past_tickets": []
+  },
+  "CUST-2107": {
+    "customer_id": "CUST-2107",
+    "owner_email": "n.rahman@orchardrow.example",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 132.0,
+    "last_charge_date": "2026-08-17",
+    "past_tickets": []
+  },
+  "CUST-2108": {
+    "customer_id": "CUST-2108",
+    "owner_email": "i.costa@fennimore.example",
+    "plan": "team",
+    "seats": 3,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 66.0,
+    "last_charge_date": "2026-08-09",
+    "past_tickets": []
+  },
+  "CUST-2109": {
+    "customer_id": "CUST-2109",
+    "owner_email": "f.olsen@glasswing.example",
+    "plan": "team",
+    "seats": 8,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 176.0,
+    "last_charge_date": "2026-08-13",
+    "past_tickets": []
+  },
+  "CUST-2110": {
+    "customer_id": "CUST-2110",
+    "owner_email": "r.jimenez@harrowpike.example",
+    "plan": "team",
+    "seats": 10,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 220.0,
+    "last_charge_date": "2026-08-11",
+    "past_tickets": []
+  },
+  "CUST-2111": {
+    "customer_id": "CUST-2111",
+    "owner_email": "l.karimi@lumenfield.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-08",
+    "past_tickets": []
+  },
+  "CUST-2112": {
+    "customer_id": "CUST-2112",
+    "owner_email": "a.volkova@marlowe.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-14",
+    "past_tickets": []
+  },
+  "CUST-2113": {
+    "customer_id": "CUST-2113",
+    "owner_email": "m.goldberg@nettlebed.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "annual",
+    "account_status": "active",
+    "last_charge_usd": 290.0,
+    "last_charge_date": "2026-08-18",
+    "past_tickets": []
+  },
+  "CUST-2114": {
+    "customer_id": "CUST-2114",
+    "owner_email": "c.lindgren@oxbow.example",
+    "plan": "team",
+    "seats": 9,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 198.0,
+    "last_charge_date": "2026-08-06",
+    "past_tickets": []
+  },
+  "CUST-2115": {
+    "customer_id": "CUST-2115",
+    "owner_email": "t.doyle@pinecrest.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-21",
+    "past_tickets": []
+  },
+  "CUST-2116": {
+    "customer_id": "CUST-2116",
+    "owner_email": "l.romano@rookery.example",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 132.0,
+    "last_charge_date": "2026-08-10",
+    "past_tickets": []
+  },
+  "CUST-2117": {
+    "customer_id": "CUST-2117",
+    "owner_email": "i.berg@sablecoast.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-02",
+    "past_tickets": []
+  },
+  "CUST-2118": {
+    "customer_id": "CUST-2118",
+    "owner_email": "j.kaminski@thistle.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-16",
+    "past_tickets": []
+  },
+  "CUST-2119": {
+    "customer_id": "CUST-2119",
+    "owner_email": "e.boateng@umber.example",
+    "plan": "pro",
+    "seats": 1,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-08-19",
+    "past_tickets": []
+  },
+  "CUST-2120": {
+    "customer_id": "CUST-2120",
+    "owner_email": "t.okafor@verity.example",
+    "plan": "free",
+    "seats": 1,
+    "billing_cycle": null,
+    "account_status": "active",
+    "last_charge_usd": 29.0,
+    "last_charge_date": "2026-07-12",
+    "past_tickets": []
+  },
+  "CUST-2121": {
+    "customer_id": "CUST-2121",
+    "owner_email": "d.ramos@willowmere.example",
+    "plan": "team",
+    "seats": 5,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 150.0,
+    "last_charge_date": "2026-08-07",
+    "past_tickets": []
+  },
+  "CUST-2122": {
+    "customer_id": "CUST-2122",
+    "owner_email": "m.lindqvist@yarrow.example",
+    "plan": "team",
+    "seats": 6,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 132.0,
+    "last_charge_date": "2026-08-03",
+    "past_tickets": [
+      {
+        "ticket_id": "H-1221",
+        "opened": "2026-08-10",
+        "summary": "Said they did not recognise the 3 August charge of $132 and had filed a chargeback with their bank.",
+        "resolution": "Routed to the billing escalation queue. The chargeback is still open with the bank."
+      }
+    ]
+  },
+  "CUST-2123": {
+    "customer_id": "CUST-2123",
+    "owner_email": "f.haddad@larkfinch.example",
+    "plan": "team",
+    "seats": 8,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 176.0,
+    "last_charge_date": "2026-08-13",
+    "past_tickets": [
+      {
+        "ticket_id": "H-1231",
+        "opened": "2026-08-17",
+        "summary": "Asked for a refund of the 13 August charge of $176 after deciding not to continue.",
+        "resolution": "Refund of $176 approved by a support manager and issued to the original card on 19 August."
+      }
+    ]
+  },
+  "CUST-2124": {
+    "customer_id": "CUST-2124",
+    "owner_email": "s.marchetti@northgate.example",
+    "plan": "team",
+    "seats": 4,
+    "billing_cycle": "monthly",
+    "account_status": "active",
+    "last_charge_usd": 88.0,
+    "last_charge_date": "2026-08-02",
+    "past_tickets": []
+  }
+}
