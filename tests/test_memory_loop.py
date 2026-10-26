@@ -127,6 +127,21 @@ async def test_history_grounds_a_reply_only_with_memory_on(make, ticket, memory,
 
 
 @pytest.mark.asyncio
+async def test_memory_off_keeps_history_out_of_the_gates_own_lookup(make, ticket) -> None:
+    """The gate looks the account up itself to verify the owner before a
+    refund. With memory off, that lookup must not ground a reply in history
+    either: '51 hours' is only in CUST-1520's past tickets."""
+    llm = ScriptedLLM(
+        completion("issue_refund", {"ticket_id": ticket.ticket_id, "amount": 10, "reason": "goodwill"}),
+        completion("send_reply", {
+            "ticket_id": ticket.ticket_id,
+            "body": "I can see your first response in June took 51 hours.",
+        }),
+    )
+    assert (await make(llm, memory=False).run(ticket)).final_state == "ESCALATE"
+
+
+@pytest.mark.asyncio
 async def test_run_started_records_the_memory_setting(make, ticket, trace) -> None:
     result = await make(ScriptedLLM(escalate(ticket)), memory=False).run(ticket)
     [started] = [e for e in trace.records(result.run_id) if e["event"] == "run_started"]

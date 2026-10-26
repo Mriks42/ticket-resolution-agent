@@ -539,7 +539,10 @@ class AgentLoop:
             )
             run.owner_checked = True
             if obs.status == "ok":
-                self._absorb(run, "lookup_customer", obs.payload)
+                # The same rule as the model's own lookups: with memory off, no
+                # history reaches the guardrail by this route either.
+                payload = obs.payload if self._memory else forget("lookup_customer", obs.payload)
+                self._absorb(run, "lookup_customer", payload)
             owner = obs.payload.get("owner_email") if obs.status == "ok" else None
             run.owner_email = owner if isinstance(owner, str) and owner.strip() else None
         return run.owner_email
