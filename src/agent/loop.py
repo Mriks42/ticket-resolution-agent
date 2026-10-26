@@ -332,6 +332,11 @@ class AgentLoop:
             return self._invalid(
                 run, call, "invalid_arguments", "amount must be a positive number of US dollars."
             )
+        if call.name == "search_past_tickets":
+            # History is this ticket's customer's only. `_absorb` reads search
+            # results as the customer's own records, so another customer's
+            # figures would otherwise ground a reply to this one.
+            args["customer_id"] = run.ticket.customer_id
 
         key = f"{call.name}:{json.dumps(args, sort_keys=True)}"
         if key in run.seen:

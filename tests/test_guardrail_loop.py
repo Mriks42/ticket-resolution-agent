@@ -115,6 +115,18 @@ async def test_account_figures_from_a_lookup_are_grounded(make, tickets) -> None
 
 
 @pytest.mark.asyncio
+async def test_another_customers_history_grounds_nothing(make, tickets) -> None:
+    """CUST-1560's history mentions an $88 charge. A search made from someone
+    else's ticket must not let that figure through as this customer's own."""
+    t = tickets["T-001"]  # CUST-1042, no prior contacts
+    llm = ScriptedLLM(
+        completion("search_past_tickets", {"query": "did not recognise the charge"}),
+        reply(t, "I can see the $88 charge you queried."),
+    )
+    assert (await make(llm).run(t)).final_state == "ESCALATE"
+
+
+@pytest.mark.asyncio
 async def test_a_proposed_refund_amount_and_the_gates_clause_are_grounded(make, tickets) -> None:
     t = tickets["T-017"]  # $290 annual charge, owner request
     llm = ScriptedLLM(

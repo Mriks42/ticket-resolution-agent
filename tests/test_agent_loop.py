@@ -155,6 +155,25 @@ async def test_the_labels_never_reach_the_model(make, ticket) -> None:
     assert ticket.requester_email in shown
 
 
+@pytest.mark.asyncio
+async def test_a_past_ticket_search_runs_for_the_tickets_customer_only(make, tickets, server) -> None:
+    """Omitted or someone else's, the customer_id that runs is the ticket's:
+    the guardrail reads search results as this customer's own records."""
+    t = tickets["T-020"]  # CUST-1520 has two prior contacts
+    llm = ScriptedLLM(
+        completion("search_past_tickets", {"query": "slow response outage"}),
+        completion("search_past_tickets", {"query": "charge refunded", "customer_id": "CUST-1560"}),
+        completion("escalate", {"ticket_id": t.ticket_id, "reason": "r"}),
+    )
+    result = await make(llm).run(t)
+
+    assert [r["args"]["customer_id"] for r in reads(server)] == [t.customer_id] * 2
+    assert [c.args["customer_id"] for c in result.tool_calls[:2]] == [t.customer_id] * 2
+    for turn in (1, 2):
+        matches = json.loads(llm.last_observation(turn))["matches"]
+        assert {m["customer_id"] for m in matches} <= {t.customer_id}
+
+
 # --- the state machine ---------------------------------------------------------
 
 
