@@ -2,9 +2,10 @@
 
 ## Status
 
-Accepted. Being built on branch `memory-layer`. The ablation is runnable; what it
-can show on the 22 held-out tickets is limited by construction, as set out
-under *What this can measure*.
+Accepted. Built on branch `memory-layer` and measured once on the held-out
+set, 2026-10-26. What that can show is limited by construction (*What this
+can measure*), and the measurement exposed a confound in the off arm that is
+still open (*Measured*).
 
 ## Context
 
@@ -147,6 +148,53 @@ history: a second trial request (TRI-001.5), a refund already issued for the
 same charge, or a repeat customer whose earlier ticket in the run establishes
 the deciding fact. Added to CLAUDE.md as the fourth Session 8 expansion
 target. Until that set exists, no README claim about memory is supportable.
+
+## Measured
+
+Three runs per arm, alternated, on the 22 held-out tickets: gpt-4o-mini,
+dense retrieval, guardrail blocking. Reports are under `evals/report/`
+(gitignored), and the run traces are in `var/trace/`.
+
+```sh
+MEMORY_ENABLED=true  uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/memory_on_run1.json
+MEMORY_ENABLED=false uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/memory_off_run1.json
+# ... run2, run3 likewise, then
+uv run python -m evals.compare_runs --trace var/trace/trace.jsonl \
+    on=evals/report/memory_on_run1.json on=... off=evals/report/memory_off_run1.json off=...
+```
+
+| | on | off |
+|---|---|---|
+| resolution rate, per run | 0.318, 0.364, 0.364 | 0.364, 0.364, 0.364 |
+| pending-approval rate, per run | 0.136, 0.136, 0.136 | 0.045, 0.136, 0.091 |
+| escalation precision, mean | 0.679 | 0.657 |
+| tool-call precision, mean | 0.776 | 0.781 |
+| hallucinated-policy rate | 0 in every run | 0 in every run |
+| tickets whose outcome differs between runs | 1 of 22 | 4 of 22 |
+| LLM cost per run | $0.0172 | $0.0153 |
+
+Means across runs are not confidence intervals; each report carries its own
+bootstrap CI. LLM cost excludes the embedding calls memory makes.
+
+- **The three tickets with history came out the same in all six runs**:
+  T-009 escalate, T-015 pending_approval, T-020 escalate. Memory content
+  changed no outcome, as predicted. The on arm wrote 66 episodes, one per run,
+  and none was ever read back, since no customer appears twice.
+- **The switch moved outcomes on tickets with no history.** T-022, with no
+  history, is pending_approval in all three on runs and resolve in all three
+  off runs. Off, the model's first search is a vaguer "refund policy", and it
+  issues a $50 "goodwill" refund that executes under ESC-001.1 instead of the
+  $264 refund held under ESC-001.2. The label says pending_approval. T-011,
+  T-016, T-017 and T-021 also vary between off runs. On these tickets the
+  two arms' inputs differ only in what the switch removes from every ticket:
+  one tool from the menu, and the empty `past_tickets` field from the account.
+  So the off arm as built measures history *and* a changed interface, and the
+  interface change alone moved one ticket three times out of three.
+
+An off arm that keeps the interface — the tool still offered, history and
+facts empty — would make the two arms' inputs identical except where history
+exists, so any difference would be memory's. Whether to change the off arm to
+that is open with the project owner.
 
 ## What it costs
 
