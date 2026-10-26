@@ -165,10 +165,11 @@ Required ablations:
 
 ### Session 8 dataset expansion targets
 
-The Session 2 set is 22 hand-written tickets. Three things about it are
+The Session 2 set is 22 hand-written tickets. Four things about it are
 measurable only in principle, and the expansion has to fix them by name.
-**Raising the ticket count alone does not address the first two** — a larger
-set drawn in the same proportions leaves both just as thin.
+**Raising the ticket count alone does not address the first, second or
+fourth** — a larger set drawn in the same proportions leaves them just as
+thin.
 
 1. **Pending-approval base, currently n=3.** The rate moves in ~33-point steps,
    so one ticket flipping is a third of the range. Needs enough
@@ -182,6 +183,15 @@ set drawn in the same proportions leaves both just as thin.
 3. **Total size.** Large enough that differences under roughly ±20 points
    become distinguishable. At 22 tickets a 95% CI on a rate spans about that
    much, so most agent-to-agent gaps are currently unprovable.
+4. **History-dependent outcomes, currently n=0.** The memory ablation
+   (ADR 0008) cannot move on the held-out set: 22 tickets from 22 customers,
+   history on three, and no labelled outcome that turns on it. Needs repeat
+   customers whose correct outcome depends on what memory holds — a second
+   trial request (TRI-001.5), a refund already issued for the same charge, an
+   earlier ticket in the same run that establishes the deciding fact — across
+   several outcomes, including cases where the history changes nothing.
+   Memory accumulates in ticket order within a run, so an earlier ticket must
+   come before the one that depends on it in the set's order.
 
 Generated tickets must match the **register range** of the hand-written set,
 not just its schema. That set runs from clean, well-formed queries to scrappy
