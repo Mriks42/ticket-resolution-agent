@@ -8,25 +8,30 @@ never model confidence. Retrieval coverage is the guardrail's, in
 
 from __future__ import annotations
 
+from datetime import date
 from decimal import Decimal
 
 import pytest
 
 from src.agent.gate import (
     MANAGER_REFUND_MAX,
+    REFUND_HISTORY_DAYS,
+    REFUND_HISTORY_LIMIT,
     SELF_SERVE_REFUND_MAX,
     Verdict,
     decide_refund,
     decide_reply,
+    recent_refunds,
 )
 from src.tools.policy import load_clauses
 
 OWNER = "r.mehta@brightfold.example"
 
 
-def refund(amount, *, already=0, requester=OWNER, owner=OWNER):
+def refund(amount, *, already=0, requester=OWNER, owner=OWNER, prior=0):
     return decide_refund(
         amount=amount, already_refunded=already, requester_email=requester, owner_email=owner,
+        prior_refunds=prior,
     )
 
 
@@ -113,6 +118,53 @@ def test_an_owner_that_cannot_be_verified_fails_closed() -> None:
 def test_the_owner_check_comes_before_the_band() -> None:
     """A non-owner asking for $1,584 escalates; it does not wait for finance."""
     assert refund(1584, requester="x@y.example").verdict is Verdict.ESCALATE
+
+
+# --- refund history: REF-002.4 ---------------------------------------------------------
+
+
+def test_two_prior_refunds_hold_even_a_self_serve_amount() -> None:
+    decision = refund(20, prior=2)
+    assert (decision.verdict, decision.rule, decision.clause, decision.approver) == (
+        Verdict.HOLD, "refund_history", "REF-002.4", "support manager",
+    )
+
+
+def test_one_prior_refund_changes_nothing() -> None:
+    assert refund(20, prior=1).clause == "ESC-001.1"
+
+
+def test_refund_history_never_lowers_a_band() -> None:
+    assert refund(176, prior=2).clause == "ESC-001.2"
+    assert refund(600, prior=3).approver == "finance"
+
+
+def test_the_owner_check_comes_before_refund_history() -> None:
+    assert refund(20, prior=5, requester="x@y.example").rule == "non_owner"
+
+
+def test_the_refund_history_limit_is_the_one_the_policy_states() -> None:
+    text = {c.clause_id: c.text for c in load_clauses()}["REF-002.4"]
+    assert "two or more refunds in the preceding 12 months" in text
+    assert (REFUND_HISTORY_LIMIT, REFUND_HISTORY_DAYS) == (2, 365)
+
+
+TODAY = date(2026, 8, 24)
+
+
+def test_recent_refunds_counts_the_preceding_twelve_months() -> None:
+    history = [
+        {"date": "2026-08-24", "amount_usd": 10.0},  # today
+        {"date": "2025-08-25", "amount_usd": 10.0},  # 364 days ago
+        {"date": "2025-08-24", "amount_usd": 10.0},  # 365 days ago: outside
+        {"date": "2024-01-01", "amount_usd": 10.0},
+    ]
+    assert recent_refunds(history, TODAY) == 2
+
+
+def test_a_refund_with_no_readable_date_counts() -> None:
+    """Failing closed: an unreadable record holds a refund, never frees one."""
+    assert recent_refunds([{"amount_usd": 10.0}, {"date": "last spring"}], TODAY) == 2
 
 
 # --- replies ------------------------------------------------------------------------

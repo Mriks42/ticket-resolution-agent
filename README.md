@@ -98,6 +98,7 @@ actions by deterministic rules, never by model confidence:
 | action | rule | result |
 |---|---|---|
 | refund | requester is not the verified account owner (ESC-001.4) | escalate |
+| refund | ticket's refund total ≤ USD 50, but the customer received 2+ refunds in the preceding 12 months (REF-002.4) | held for a support manager |
 | refund | ticket's refund total ≤ USD 50 (ESC-001.1) | executes |
 | refund | ticket's refund total USD 50.01–500 (ESC-001.2) | held for a support manager |
 | refund | ticket's refund total > USD 500 (ESC-001.3) | held for finance |
@@ -137,7 +138,9 @@ uv run pytest                 # the full suite; no network, no key, $0
 ```
 
 Tests that need Postgres skip with the reason shown when it is not running.
-One test calls the real model and is opt-in:
+CI (`.github/workflows/tests.yml`) runs the same suite on every push, against a
+pgvector service container, with `TRA_REQUIRE_PG=1` so those tests fail rather
+than skip. One test calls the real model and is opt-in:
 
 ```sh
 TRA_LIVE=1 uv run pytest tests/test_live.py -s    # one ticket, about $0.001
@@ -274,7 +277,7 @@ waiting for label review.
 Not built yet:
 
 - the rest of the synthetic expansion (batches 2-6, after batch 1's review)
-- the FastAPI service, Terraform for AWS, and CI
+- the FastAPI service and Terraform for AWS
 
 ## Design decisions
 
@@ -290,3 +293,4 @@ Not built yet:
 | [0008](docs/adr/0008-memory-layer.md) | the memory layer: what "off" removes, and what the agent may write |
 | [0009](docs/adr/0009-cost-and-latency-metrics.md) | cost and latency per resolved ticket |
 | [0010](docs/adr/0010-synthetic-dataset.md) | the synthetic dataset: hand-written specs, generated wording, reviewed labels |
+| [0011](docs/adr/0011-refund-history-in-the-gate.md) | refund history in the gate (REF-002.4), as account state |

@@ -97,13 +97,12 @@ this for every held refund.
 
 ## Found while writing the specs
 
-- **REF-002.4 is not enforced by the gate.** A customer with two or more
+- **REF-002.4 was not enforced by the gate.** A customer with two or more
   refunds in the past 12 months needs approval for any further refund,
-  whatever the amount. The gate bands by amount only, so a $20 refund to such
-  a customer would go through, against the label. Tickets testing it would
-  measure a gap the agent cannot close. Batch 1 leaves it out. Enforcing it in
-  the gate is a natural use of semantic memory's refund history, and a
-  separate change.
+  whatever the amount. The gate banded by amount only, so a $20 refund to such
+  a customer would have gone through, against the label. Batch 1 leaves it
+  out. ADR 0011 since enforced it from the account's billing history, so later
+  batches can include it, with refunds kept well inside the 12-month window.
 - **Outcome-only scoring hides content errors.** A reply that grants a second
   trial, against TRI-001.5, scores the same as one that refuses it. That is
   why the history-dependent specs are restricted as above. It is also a

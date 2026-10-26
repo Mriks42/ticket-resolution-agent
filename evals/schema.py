@@ -94,6 +94,17 @@ class PastTicket(BaseModel):
     resolution: str
 
 
+class RefundRecord(BaseModel):
+    """A refund the customer has received: billing history, which the gate
+    counts for REF-002.4 (ADR 0011)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    date: str
+    amount_usd: float
+    ticket_id: str | None = None
+
+
 class Customer(BaseModel):
     """The account state `lookup_customer` returns during an eval run."""
 
@@ -108,6 +119,7 @@ class Customer(BaseModel):
     last_charge_usd: float | None
     last_charge_date: str | None
     past_tickets: list[PastTicket] = []
+    refunds: list[RefundRecord] = []
 
 
 class ToolCall(BaseModel):

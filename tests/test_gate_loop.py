@@ -9,6 +9,7 @@ why.
 from __future__ import annotations
 
 import json
+from datetime import date
 
 import pytest
 
@@ -267,3 +268,77 @@ def test_the_agent_wires_a_non_retrying_writer(monkeypatch, tmp_path) -> None:
     agent = LoopAgent()
     assert agent._writer._retry.max_attempts == 1
     assert agent._executor._retry.max_attempts > 1
+
+
+# --- refund history: REF-002.4 ---------------------------------------------------------
+
+TODAY = date(2026, 8, 24)
+
+
+def prior_refunds(ctx, customer_id: str, *dates: str) -> None:
+    for d in dates:
+        ctx.billing.record_refund(customer_id, amount_usd=29.0, date=d, ticket_id=None)
+
+
+@pytest.mark.asyncio
+async def test_two_recent_refunds_hold_even_a_self_serve_refund(make, owner_ticket, ctx, trace) -> None:
+    prior_refunds(ctx, owner_ticket.customer_id, "2026-03-02", "2026-06-15")
+    llm = ScriptedLLM(refund(owner_ticket, 20), reply(owner_ticket, "Submitted for approval."))
+    result = await make(llm, today=lambda: TODAY).run(owner_ticket)
+
+    assert result.outcome is Outcome.PENDING_APPROVAL
+    assert ctx.store.records("refunds") == []
+    first = gate_events(trace, result.run_id)[0]
+    assert (first["verdict"], first["rule"], first["clause"]) == ("hold", "refund_history", "REF-002.4")
+    assert first["facts"]["prior_refunds"] == 2
+
+
+@pytest.mark.asyncio
+async def test_refunds_older_than_twelve_months_do_not_count(make, owner_ticket, ctx) -> None:
+    prior_refunds(ctx, owner_ticket.customer_id, "2025-06-01", "2025-08-01")
+    llm = ScriptedLLM(refund(owner_ticket, 20), reply(owner_ticket))
+    assert (await make(llm, today=lambda: TODAY).run(owner_ticket)).outcome is Outcome.RESOLVE
+    assert [r["amount"] for r in ctx.store.records("refunds")] == [20.0]
+
+
+@pytest.mark.asyncio
+async def test_a_refund_issued_earlier_in_the_ticket_counts(make, owner_ticket, ctx, trace) -> None:
+    prior_refunds(ctx, owner_ticket.customer_id, "2026-06-15")
+    llm = ScriptedLLM(
+        refund(owner_ticket, 10),
+        refund(owner_ticket, 10, reason="the second charge as well"),
+        reply(owner_ticket, "Submitted for approval."),
+    )
+    result = await make(llm, today=lambda: TODAY).run(owner_ticket)
+
+    assert result.outcome is Outcome.PENDING_APPROVAL
+    assert [(g["verdict"], g["rule"]) for g in gate_events(trace, result.run_id)][:2] == [
+        ("execute", "refund_band"), ("hold", "refund_history"),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_an_executed_refund_joins_the_billing_history(make, owner_ticket, ctx) -> None:
+    """So the next ticket from this customer, in the same run, counts it."""
+    llm = ScriptedLLM(refund(owner_ticket, 10), reply(owner_ticket))
+    await make(llm, today=lambda: TODAY).run(owner_ticket)
+    assert ctx.billing.refunds(owner_ticket.customer_id) == [
+        {"date": "2026-08-24", "amount_usd": 10.0, "ticket_id": owner_ticket.ticket_id},
+    ]
+
+
+@pytest.mark.asyncio
+async def test_a_held_refund_does_not_join_the_billing_history(make, owner_ticket, ctx) -> None:
+    """REF-002.4 counts refunds received; a held one has not been."""
+    llm = ScriptedLLM(refund(owner_ticket, 176), reply(owner_ticket, "Submitted for approval."))
+    await make(llm, today=lambda: TODAY).run(owner_ticket)
+    assert ctx.billing.refunds(owner_ticket.customer_id) == []
+
+
+@pytest.mark.asyncio
+async def test_memory_off_does_not_change_what_the_gate_enforces(make, owner_ticket, ctx) -> None:
+    """Billing history is account state, not memory (ADR 0011)."""
+    prior_refunds(ctx, owner_ticket.customer_id, "2026-03-02", "2026-06-15")
+    llm = ScriptedLLM(refund(owner_ticket, 20), reply(owner_ticket, "Submitted for approval."))
+    result = await make(llm, memory=False, today=lambda: TODAY).run(owner_ticket)
+    assert result.outcome is Outcome.PENDING_APPROVAL

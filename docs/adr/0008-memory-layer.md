@@ -220,6 +220,14 @@ out the same as before. This is the null result the held-out set allows: the
 switch works and changes nothing else. Whether memory helps needs the
 history-dependent tickets of Session 8.
 
+**A leak found afterwards.** Before a refund, the gate looks the account up
+itself to verify the owner. That lookup was absorbed into guardrail grounding
+with its history, even with memory off. It was fixed by sending it through the
+same emptying as the model's lookups. In the second off arm, the only history
+ticket that reached the gate was T-015. Its held replies quote $58 (in the
+message) and $132 (the account's last charge), neither of which needed the
+history. So no outcome above depended on the leak.
+
 ## What it costs
 
 - The lexical in-process store and the pgvector store are two

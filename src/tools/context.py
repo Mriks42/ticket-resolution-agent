@@ -8,6 +8,7 @@ from pathlib import Path
 from src.memory import Memory, build_memory
 from src.memory.episodic import PgEpisodes
 from src.paths import resolve_var_dir
+from src.tools.billing import BillingHistory
 from src.tools.dense import DensePolicyIndex
 from src.tools.embeddings import Embedder
 from src.tools.fixtures import FixtureBackend
@@ -23,6 +24,9 @@ class ToolContext:
     #: Fresh per context, seeded from the fixtures' past tickets: one eval run
     #: builds one context, so no run sees another's writes (ADR 0008).
     memory: Memory
+    #: Refunds received, seeded from the fixtures; per context like memory, but
+    #: account state rather than memory (ADR 0011).
+    billing: BillingHistory
 
     @classmethod
     def build(
@@ -40,6 +44,7 @@ class ToolContext:
             store=WriteStore(resolved),
             var_dir=resolved,
             memory=build_memory(retrieval, fixtures.history_seed()),
+            billing=BillingHistory.from_customers(fixtures.records),
         )
 
     def embedders(self) -> list[Embedder]:

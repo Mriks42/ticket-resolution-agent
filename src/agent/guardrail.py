@@ -136,8 +136,8 @@ def extract_facts(text: str) -> set[Fact]:
 
 
 def account_grounding(account: Mapping | None) -> tuple[list[str], set[Fact]]:
-    """What a `lookup_customer` record grounds: its dollar figures and seat
-    count as facts, its past tickets as text. Shared by the loop and
+    """What a `lookup_customer` record grounds: its dollar figures, seat count
+    and refund amounts as facts, its past tickets as text. Shared by the loop and
     `evals/guardrail_eval.py`, so both ground a reply the same way."""
     if not isinstance(account, Mapping):
         return [], set()
@@ -149,6 +149,11 @@ def account_grounding(account: Mapping | None) -> tuple[list[str], set[Fact]]:
             found.add(usd(value))
         elif key == "seats":
             found.add(Fact("count", Decimal(int(value)), "seat"))
+    # Refunds the customer has received are their own figures too (ADR 0011).
+    for refund in account.get("refunds") or []:
+        amount = refund.get("amount_usd") if isinstance(refund, Mapping) else None
+        if isinstance(amount, (int, float)) and not isinstance(amount, bool):
+            found.add(usd(amount))
     return history_text(account.get("past_tickets")), found
 
 

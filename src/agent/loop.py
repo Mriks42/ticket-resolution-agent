@@ -68,12 +68,12 @@ import time
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field, replace
-from datetime import datetime, timezone
+from datetime import date
 
 from evals.schema import AgentResult, Outcome, Ticket, Tool, ToolCall
 from src.agent.config import AgentConfig
 from src.agent.executor import MCPToolExecutor, Observation, ToolExecutor
-from src.agent.gate import Decision, Verdict, decide_refund, decide_reply
+from src.agent.gate import Decision, Verdict, decide_refund, decide_reply, recent_refunds
 from src.agent.guardrail import Fact, Sources, account_grounding, cited_clause_ids, history_text, usd
 from src.agent.guardrail import check as check_claims
 from src.agent.llm import (
@@ -96,6 +96,7 @@ from src.agent.trace import TraceLog
 from src.mcp.server import MCPServer
 from src.memory import Memory
 from src.memory.close import Close, Refund
+from src.tools.billing import BillingHistory
 from src.tools.catalog import CATALOG
 from src.tools.context import ToolContext
 from src.tools.policy import Clause, load_policy_index
@@ -209,6 +210,8 @@ class _Run:
     escalation_filed: bool = False
     owner_email: str | None = None
     owner_checked: bool = False
+    #: The account's refunds as the gate's own lookup found them (REF-002.4).
+    billed: list[dict] = field(default_factory=list)
 
 
 class AgentLoop:
@@ -229,6 +232,8 @@ class AgentLoop:
         clause_lookup: Callable[[str], Clause | None] | None = None,
         memory_store: Memory | None = None,
         embedding_meter: EmbeddingMeter | None = None,
+        billing: BillingHistory | None = None,
+        today: Callable[[], date] = date.today,
     ) -> None:
         self._llm = llm
         self._executor = executor
@@ -246,6 +251,11 @@ class AgentLoop:
         self._memory_store = memory_store
         #: Embedding spend by the tools, charged to the run it happened in.
         self._meter = embedding_meter
+        #: Where an executed refund is recorded, so later tickets from the same
+        #: customer count it (ADR 0011). The same object the tools read.
+        self._billing = billing
+        #: The calendar date, for REF-002.4's 12 months and for memory.
+        self._today = today
         self._schemas = tool_schemas()
 
     async def run(self, ticket: Ticket) -> AgentResult:
@@ -463,16 +473,23 @@ class AgentLoop:
         facts: dict = {}
         if call.name == "issue_refund":
             owner = await self._owner_email(run)
+            # The account's refunds before this ticket, plus any this ticket
+            # has already issued: both are refunds the customer has received.
+            prior = recent_refunds(run.billed, self._today()) + sum(
+                1 for r in run.refunds if r.status == "issued"
+            )
             facts = {
                 "requester_email": run.ticket.requester_email,
                 "owner_verified": owner is not None,
                 "refunded_before": run.refunded,
+                "prior_refunds": prior,
             }
             decision = decide_refund(
                 amount=args["amount"],
                 already_refunded=run.refunded,
                 requester_email=run.ticket.requester_email,
                 owner_email=owner,
+                prior_refunds=prior,
             )
         else:
             decision = decide_reply(pending=bool(run.held))
@@ -522,6 +539,11 @@ class AgentLoop:
             run.refunded += args["amount"]
             run.refunds.append(Refund(float(args["amount"]), "issued"))
             run.context_facts.add(usd(args["amount"]))
+            if self._billing is not None:
+                self._billing.record_refund(
+                    run.ticket.customer_id, amount_usd=float(args["amount"]),
+                    date=self._today().isoformat(), ticket_id=run.ticket.ticket_id,
+                )
         content = obs.for_model()
         if obs.status == "ok" and decision.clause:
             content = json.dumps({**obs.payload, "policy": self._show_clause(run, decision.clause)})
@@ -532,7 +554,8 @@ class AgentLoop:
 
     async def _owner_email(self, run: _Run) -> str | None:
         """The verified owner, from the gate's own audited lookup — never from
-        anything the model said. None if it cannot be established."""
+        anything the model said. None if it cannot be established. The same
+        lookup supplies the account's refunds for REF-002.4."""
         if not run.owner_checked:
             obs = await self._executor.call(
                 "lookup_customer", {"customer_id": run.ticket.customer_id}, run_id=run.run_id
@@ -545,6 +568,8 @@ class AgentLoop:
                 self._absorb(run, "lookup_customer", payload)
             owner = obs.payload.get("owner_email") if obs.status == "ok" else None
             run.owner_email = owner if isinstance(owner, str) and owner.strip() else None
+            refunds = obs.payload.get("refunds") if obs.status == "ok" else None
+            run.billed = [r for r in refunds if isinstance(r, dict)] if isinstance(refunds, list) else []
         return run.owner_email
 
     def _show_clause(self, run: _Run, clause_id: str | None) -> dict | None:
@@ -632,7 +657,7 @@ class AgentLoop:
             ticket_id=run.ticket.ticket_id,
             body=run.ticket.body,
             final_state=run.state.value,
-            date=datetime.now(timezone.utc).date().isoformat(),
+            date=self._today().isoformat(),
             refunds=tuple(run.refunds),
             clauses=tuple(sorted(c for c in cited | run.rested_on if self._clause_lookup(c))),
         )
@@ -755,4 +780,5 @@ class LoopAgent(AgentLoop):
             },
             memory_store=context.memory,
             embedding_meter=EmbeddingMeter(context.embedders()),
+            billing=context.billing,
         )

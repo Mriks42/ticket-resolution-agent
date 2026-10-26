@@ -21,7 +21,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from collections.abc import Mapping
+
 from evals.loader import load_all_customers
+from evals.schema import Customer
 from src.memory.episodic import Episode
 from src.paths import DEFAULT_DATASET_DIR
 from src.tools.errors import ToolInputError
@@ -51,10 +54,17 @@ class FixtureBackend:
     def policy(self) -> PolicySearch:
         return self._policy
 
+    @property
+    def records(self) -> Mapping[str, Customer]:
+        return self._customers
+
     def customer(self, customer_id: str) -> dict:
-        """The account record `lookup_customer` returns, without its history."""
+        """The account record `lookup_customer` returns, without its history or
+        refunds: memory and billing answer for those."""
         self.check_customer(customer_id)
-        return self._customers[customer_id].model_dump(mode="json", exclude={"past_tickets"})
+        return self._customers[customer_id].model_dump(
+            mode="json", exclude={"past_tickets", "refunds"}
+        )
 
     def check_customer(self, customer_id: str) -> None:
         if customer_id not in self._customers:

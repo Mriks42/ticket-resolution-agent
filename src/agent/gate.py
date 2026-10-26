@@ -28,7 +28,12 @@ verify fails closed. (2) Band, ESC-001.1–.3, applied to the ticket's running
 total (refunds already executed or held, plus this one): up to USD 50
 executes, up to USD 500 waits for a support manager, above that for finance.
 Banding the total rather than each refund means a refund cannot be split into
-pieces that each look self-serve; ADR 0006 records the decision.
+pieces that each look self-serve; ADR 0006 records the decision. (3) Refund
+history, REF-002.4: a customer who has received two or more refunds in the
+preceding 12 months needs approval for any further refund, so a refund the
+band would have executed waits for a support manager instead. It never
+lowers a band. The count comes from the account's billing history, which is
+account state rather than memory (ADR 0011).
 
 **Replies.** If an approval is pending, the reply is held with it as one
 package; otherwise it executes. The owner check does not apply to replies
@@ -42,7 +47,9 @@ against the clause text, so the copy cannot drift silently.
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 
@@ -51,6 +58,10 @@ SELF_SERVE_REFUND_MAX = Decimal("50.00")
 #: ESC-001.2: "between USD 50.01 and USD 500 requires support manager approval".
 #: Above it, ESC-001.3: "requires finance approval".
 MANAGER_REFUND_MAX = Decimal("500.00")
+#: REF-002.4: "A customer who has received two or more refunds in the
+#: preceding 12 months requires approval for any further refund".
+REFUND_HISTORY_LIMIT = 2
+REFUND_HISTORY_DAYS = 365
 
 class Verdict(str, Enum):
     EXECUTE = "execute"
@@ -73,6 +84,7 @@ def decide_refund(
     already_refunded: float,
     requester_email: str,
     owner_email: str | None,
+    prior_refunds: int = 0,
 ) -> Decision:
     if owner_email is None:
         return Decision(
@@ -90,6 +102,13 @@ def decide_refund(
     cents = _cents(amount)
     total = _cents(already_refunded) + cents
     on_ticket = f"USD {cents}, bringing this ticket's refunds to USD {total},"
+    if total <= SELF_SERVE_REFUND_MAX and prior_refunds >= REFUND_HISTORY_LIMIT:
+        return Decision(
+            Verdict.HOLD, "refund_history",
+            f"{on_ticket} is self-serve by amount, but the customer has received "
+            f"{prior_refunds} refunds in the preceding 12 months, so it needs approval",
+            clause="REF-002.4", approver="support manager",
+        )
     if total <= SELF_SERVE_REFUND_MAX:
         return Decision(
             Verdict.EXECUTE, "refund_band",
@@ -107,6 +126,23 @@ def decide_refund(
         f"{on_ticket} is above USD {MANAGER_REFUND_MAX} and needs finance approval",
         clause="ESC-001.3", approver="finance",
     )
+
+
+def recent_refunds(history: Iterable[Mapping], today: date) -> int:
+    """Refunds in `history` received in the 12 months before `today`, today
+    included. A record without a readable date counts: failing closed holds a
+    refund rather than letting one through."""
+    since = today - timedelta(days=REFUND_HISTORY_DAYS)
+    count = 0
+    for record in history:
+        try:
+            received = date.fromisoformat(str(record.get("date")))
+        except ValueError:
+            count += 1
+            continue
+        if since < received <= today:
+            count += 1
+    return count
 
 
 def decide_reply(*, pending: bool) -> Decision:

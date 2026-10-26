@@ -206,7 +206,7 @@ def trace(tmp_path) -> TraceLog:
 def make(ctx, server, writer, trace):
     def build(
         llm, *, executor=None, write_executor=None, clock=time.monotonic, spend=None,
-        embedding_meter=None, **config,
+        embedding_meter=None, today=None, **config,
     ):
         return AgentLoop(
             llm=llm,
@@ -218,6 +218,8 @@ def make(ctx, server, writer, trace):
             spend=spend,
             memory_store=ctx.memory,
             embedding_meter=embedding_meter,
+            billing=ctx.billing,
+            **({"today": today} if today else {}),
         )
 
     return build

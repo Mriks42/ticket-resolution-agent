@@ -115,6 +115,18 @@ async def test_account_figures_from_a_lookup_are_grounded(make, tickets) -> None
 
 
 @pytest.mark.asyncio
+async def test_a_refund_in_the_billing_history_is_grounded(make, tickets, ctx) -> None:
+    """$17.50 is in no passage, ticket or charge: only in the account's refunds."""
+    t = tickets["T-001"]
+    ctx.billing.record_refund(t.customer_id, amount_usd=17.5, date="2026-05-02", ticket_id="T-400")
+    llm = ScriptedLLM(
+        completion("lookup_customer", {"customer_id": t.customer_id}),
+        reply(t, "I can see the $17.50 refund we issued in May."),
+    )
+    assert (await make(llm).run(t)).final_state == "RESOLVE"
+
+
+@pytest.mark.asyncio
 async def test_another_customers_history_grounds_nothing(make, tickets) -> None:
     """CUST-1560's history mentions an $88 charge. A search made from someone
     else's ticket must not let that figure through as this customer's own."""

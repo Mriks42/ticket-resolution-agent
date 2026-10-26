@@ -12,7 +12,9 @@ import json
 import pytest
 
 from evals.loader import load_tickets
+from evals.schema import Customer, RefundRecord
 from src.memory.close import Close
+from src.tools.billing import BillingHistory
 from src.tools.catalog import CATALOG, Scope
 from src.tools.context import ToolContext
 from src.tools.errors import ToolInputError
@@ -147,6 +149,37 @@ def test_lookup_customer_shows_remembered_facts_once_there_are_some(ctx: ToolCon
     record = call(ctx, "lookup_customer", customer_id="CUST-1042")
     assert record["memory"] == written["facts"]
     assert list(record)[-2:] == ["past_tickets", "memory"]
+
+
+def test_lookup_customer_shows_refund_history_only_when_there_is_some(ctx: ToolContext) -> None:
+    """Absent for a customer with no refunds, so the held-out accounts read
+    exactly as before; account state, so memory off does not touch it."""
+    assert "refunds" not in call(ctx, "lookup_customer", customer_id="CUST-1042")
+    ctx.billing.record_refund("CUST-1042", amount_usd=29.0, date="2026-05-02", ticket_id="T-500")
+    record = call(ctx, "lookup_customer", customer_id="CUST-1042")
+    assert record["refunds"] == [{"date": "2026-05-02", "amount_usd": 29.0, "ticket_id": "T-500"}]
+    assert list(record)[-2:] == ["refunds", "past_tickets"]
+
+
+def test_billing_history_is_seeded_from_the_customer_records() -> None:
+    customers = {
+        "CUST-X": Customer(
+            customer_id="CUST-X", owner_email="x@x.example", plan="pro", seats=1,
+            billing_cycle="monthly", account_status="active", last_charge_usd=29.0,
+            last_charge_date="2026-08-01",
+            refunds=[RefundRecord(date="2026-03-02", amount_usd=29.0)],
+        ),
+    }
+    billing = BillingHistory.from_customers(customers)
+    assert billing.refunds("CUST-X") == [{"date": "2026-03-02", "amount_usd": 29.0, "ticket_id": None}]
+    assert billing.refunds("CUST-Y") == []
+
+
+def test_what_one_context_bills_another_does_not_see(tmp_path) -> None:
+    a = ToolContext.build(var_dir=tmp_path / "a", retrieval=RetrievalConfig())
+    b = ToolContext.build(var_dir=tmp_path / "b", retrieval=RetrievalConfig())
+    a.billing.record_refund("CUST-1042", amount_usd=10.0, date="2026-08-24", ticket_id="T-001")
+    assert b.billing.refunds("CUST-1042") == []
 
 
 def test_what_one_context_remembers_another_does_not_see(tmp_path) -> None:
