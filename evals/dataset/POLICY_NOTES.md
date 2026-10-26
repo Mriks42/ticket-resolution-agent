@@ -55,6 +55,17 @@ explicit prohibition still routed to approval because a goodwill route exists
 elsewhere in the corpus, no policy would ever be dispositive and
 `pending_approval` would stop carrying meaning.
 
+## Ruling: which non-owner requests ESC-001.4 escalates
+
+ESC-001.4 escalates "any request from someone not verified as the account
+owner". **Ruling (label owner, 2026-10-26):** a general question that published
+policy answers on its own, with no account action and no account data, is not
+such a request, and is answered. Everything else from a non-owner escalates.
+For example, "does the Team plan include SSO?" is answered, and "cancel our
+subscription" escalates. The loader enforces the boundary: a non-owner ticket
+labelled other than escalate may not expect `issue_refund` and must carry a
+`label_note` (ADR 0010).
+
 ## Partial overlaps (consistent, but multiple documents apply)
 
 These are not contradictions. They exist so that "the relevant policy" is

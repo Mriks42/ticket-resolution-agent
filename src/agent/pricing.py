@@ -1,7 +1,10 @@
 """What a completion cost, and the hard cap on what an eval run may spend.
 
-Prices are per million tokens, from OpenAI's model pages, checked 2026-10-14:
+Prices are per million tokens, from OpenAI's model pages: gpt-4o-mini checked
+2026-10-14, gpt-4o (the synthetic-ticket writer, `evals/generate/`) checked
+2026-10-26:
 https://developers.openai.com/api/docs/models/gpt-4o-mini
+https://developers.openai.com/api/docs/models/gpt-4o
 
 All input is priced at the full input rate. OpenAI discounts cached input, so
 this overstates cost slightly when the prompt prefix is cached — the safe
@@ -36,6 +39,7 @@ class Price:
 
 PRICES: dict[str, Price] = {
     "gpt-4o-mini": Price(input_per_mtok=0.15, output_per_mtok=0.60),
+    "gpt-4o": Price(input_per_mtok=2.50, output_per_mtok=10.00),
 }
 
 #: USD per million tokens, from OpenAI's model page, checked 2026-10-26:

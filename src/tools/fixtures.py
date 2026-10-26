@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from evals.loader import load_customers
+from evals.loader import load_all_customers
 from src.memory.episodic import Episode
 from src.paths import DEFAULT_DATASET_DIR
 from src.tools.errors import ToolInputError
@@ -42,7 +42,9 @@ class FixtureBackend:
         retrieval: RetrievalConfig | None = None,
     ) -> None:
         self.dataset_dir = Path(dataset_dir or DEFAULT_DATASET_DIR)
-        self._customers = load_customers(self.dataset_dir / "customers.json")
+        self._customers = load_all_customers(
+            self.dataset_dir / "customers.json", self.dataset_dir / "synthetic"
+        )
         self._policy = build_policy_index(self.dataset_dir / "policies", retrieval)
 
     @property

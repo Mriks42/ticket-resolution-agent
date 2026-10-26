@@ -3,6 +3,10 @@
     python -m evals.run
     python -m evals.run --agent evals.agents.stub:AlwaysEscalateAgent --out report.json
     python -m evals.run --agent src.agent.loop:LoopAgent
+    python -m evals.run --agent src.agent.loop:LoopAgent --set full
+
+`--set` picks the tickets: `held-out` (the default, the 22 hand-written ones),
+`synthetic` (reviewed generated batches only) or `full` (both, held-out first).
 
 The real agent reads its configuration from the environment; `.env` is loaded
 at startup. It calls the real model and is capped by EVAL_SPEND_CAP_USD
@@ -21,7 +25,7 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from evals.loader import POLICY_DIR, TICKETS_PATH, load_tickets
+from evals.loader import POLICY_DIR, TICKETS_PATH, load_synthetic, load_tickets
 from evals.metrics import DEFAULT_RESAMPLES, DEFAULT_SEED, MetricResult, evaluate, format_value
 from evals.schema import Agent, AgentResult, Confidence, Outcome, Ticket
 from src.config import load_dotenv
@@ -49,6 +53,22 @@ async def run_agent(agent: Agent, tickets: list[Ticket]) -> dict[str, AgentResul
             )
         results[ticket.ticket_id] = result
     return results
+
+
+def select_tickets(name: str, dataset: Path = TICKETS_PATH, policies: Path = POLICY_DIR) -> list[Ticket]:
+    """The ticket set an eval runs on. A synthetic set with no reviewed batch
+    is refused rather than run as an empty or held-out-only set."""
+    held_out = load_tickets(dataset, policies) if name in ("held-out", "full") else []
+    synthetic = load_synthetic(policy_dir=policies) if name in ("synthetic", "full") else []
+    if name != "held-out" and not synthetic:
+        raise SystemExit(
+            "no reviewed synthetic batches yet: review one in evals/dataset/synthetic/ "
+            "and set \"reviewed\": true"
+        )
+    clash = {t.ticket_id for t in held_out} & {t.ticket_id for t in synthetic}
+    if clash:
+        raise ValueError(f"ticket ids in both sets: {sorted(clash)}")
+    return held_out + synthetic
 
 
 def format_report(
@@ -209,7 +229,8 @@ def build_report(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--agent", default="evals.agents.stub:AlwaysEscalateAgent")
-    parser.add_argument("--dataset", type=Path, default=TICKETS_PATH)
+    parser.add_argument("--set", dest="ticket_set", choices=("held-out", "synthetic", "full"), default="held-out")
+    parser.add_argument("--dataset", type=Path, default=TICKETS_PATH, help="held-out tickets file")
     parser.add_argument("--policies", type=Path, default=POLICY_DIR)
     parser.add_argument("--resamples", type=int, default=DEFAULT_RESAMPLES)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
@@ -217,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     load_dotenv()
 
-    tickets = load_tickets(args.dataset, args.policies)
+    tickets = select_tickets(args.ticket_set, args.dataset, args.policies)
     agent = load_agent(args.agent)
     results = asyncio.run(run_agent(agent, tickets))
     metrics = evaluate(tickets, results, args.resamples, args.seed)
@@ -232,6 +253,7 @@ def main(argv: list[str] | None = None) -> int:
         report = build_report(
             agent.name, tickets, results, metrics, args.resamples, args.seed
         )
+        report["ticket_set"] = args.ticket_set
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(report, indent=2), encoding="utf-8")
         print(f"report written to {args.out}\n")
