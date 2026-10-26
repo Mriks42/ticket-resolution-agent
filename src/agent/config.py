@@ -56,10 +56,11 @@ class AgentConfig:
     #: report a hallucinated-policy rate.
     guardrail_mode: str = "block"
 
-    #: On, the customer's history reaches the agent — the past-ticket search
-    #: and `past_tickets` in the account record. Off, neither does, which is
-    #: the stateless baseline of the memory ablation (ADR 0008). The account
-    #: itself (plan, seats, charges) is current state, not memory, and stays.
+    #: On, the customer's history reaches the agent — through the past-ticket
+    #: search and `past_tickets` in the account record. Off, both come back
+    #: empty, in the same shape, and nothing is written: the stateless
+    #: baseline of the memory ablation (ADR 0008). The account itself (plan,
+    #: seats, charges) is current state, not memory, and stays.
     memory: bool = True
 
     def __post_init__(self) -> None:

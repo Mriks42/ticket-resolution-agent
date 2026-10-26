@@ -25,11 +25,13 @@ decided by the gate's deterministic rules and then carried out by the loop:
 - ESCALATE  the action does not run; the ticket ends in ESCALATE.
 
 **Memory is switchable** (`AgentConfig.memory`, ADR 0008). Off, the
-customer's history never enters the run: the past-ticket search is not
-offered, `past_tickets` and `memory` are removed from the account record
-before the model or the guardrail sees it, and nothing is written at close.
-On, a history search always runs for the ticket's own customer, whatever the
-model asked for, and the run is remembered at close.
+customer's history never enters the run, and nothing else changes: the same
+tools are offered, but a past-ticket search finds nothing, the account
+record's `past_tickets` is empty and its `memory` absent — before the model or
+the guardrail sees either — and nothing is written at close. For a customer
+with no history the two arms see identical input. On, a history search always
+runs for the ticket's own customer, whatever the model asked for, and the run
+is remembered at close.
 
 `escalate` itself always goes through, and wins over anything held: the gate
 never overrides a hand-off. Every run that ends in ESCALATE or FAILED files
@@ -103,10 +105,6 @@ READ_SCOPES = frozenset(spec.scope for spec in CATALOG.values() if not spec.gate
 #: Granted to the server only the gate dispatches to. The model never reaches it.
 WRITE_SCOPES = frozenset(spec.scope for spec in CATALOG.values() if spec.gated)
 GATED = frozenset(name for name, spec in CATALOG.items() if spec.gated)
-#: What memory off removes: the tool that reads history, and the account
-#: record's history and remembered facts.
-MEMORY_TOOLS = frozenset({"search_past_tickets"})
-MEMORY_FIELDS = ("past_tickets", "memory")
 
 OUTCOME = {
     State.RESOLVE: Outcome.RESOLVE,
@@ -130,14 +128,20 @@ EMPTY_RETRIEVAL_NOTE = (
 _CLAUSE_ID = re.compile(r"\b([A-Z]{3}-\d{3})\.\d+\b")
 
 
-def tool_schemas(*, memory: bool = True) -> list[FunctionSchema]:
-    """The catalog tools, as the model sees them. The catalog is the one
-    source; with memory off the history search is left out."""
-    return [
-        FunctionSchema(s.name, s.description, s.input_schema)
-        for s in CATALOG.values()
-        if memory or s.name not in MEMORY_TOOLS
-    ]
+def tool_schemas() -> list[FunctionSchema]:
+    """Every catalog tool, as the model sees it. The catalog is the one source."""
+    return [FunctionSchema(s.name, s.description, s.input_schema) for s in CATALOG.values()]
+
+
+def forget(tool: str, payload: dict) -> dict:
+    """A read result with the customer's history emptied out, in the same
+    shape: what memory off shows. Keeping the shape is the point — hiding the
+    field or the tool changed outcomes on tickets with no history (ADR 0008)."""
+    if tool == "lookup_customer":
+        return {**{k: v for k, v in payload.items() if k != "memory"}, "past_tickets": []}
+    if tool == "search_past_tickets":
+        return {**payload, "matches": []}
+    return payload
 
 
 def render_ticket(ticket: Ticket) -> str:
@@ -239,8 +243,7 @@ class AgentLoop:
         #: Where a closed run is remembered. None writes nothing; reads still
         #: come through the tools, whose context holds the same store.
         self._memory_store = memory_store
-        self._schemas = tool_schemas(memory=self._memory)
-        self._offered = [s.name for s in self._schemas]
+        self._schemas = tool_schemas()
 
     async def run(self, ticket: Ticket) -> AgentResult:
         run = _Run(run_id=f"run-{uuid.uuid4().hex[:12]}", ticket=ticket, started=self._clock())
@@ -349,10 +352,10 @@ class AgentLoop:
 
         if call is None:
             return self._invalid(run, None, "no_tool_call", "Every turn must call exactly one tool.")
-        if call.name not in self._offered:
+        if call.name not in CATALOG:
             return self._invalid(
                 run, call, "unknown_tool",
-                f"There is no tool named {call.name!r}. Use one of: {', '.join(self._offered)}.",
+                f"There is no tool named {call.name!r}. Use one of: {', '.join(CATALOG)}.",
             )
         try:
             args = json.loads(call.arguments)
@@ -414,10 +417,8 @@ class AgentLoop:
                 run, State.ESCALATE,
                 f"wall-clock budget exhausted ({cfg.max_seconds:g}s) during {call.name}",
             )
-        if call.name == "lookup_customer" and obs.status == "ok" and not self._memory:
-            obs = replace(obs, payload={
-                k: v for k, v in obs.payload.items() if k not in MEMORY_FIELDS
-            })
+        if obs.status == "ok" and not self._memory:
+            obs = replace(obs, payload=forget(call.name, obs.payload))
         content = obs.for_model()
         if obs.status == "ok":
             self._absorb(run, call.name, obs.payload)

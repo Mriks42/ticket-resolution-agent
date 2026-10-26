@@ -120,8 +120,9 @@ policies cited more than once. Every run writes at its terminal state, with
 the customer's words and a fixed-template outcome. The model's own prose is
 never stored, because the guardrail treats history as the customer's records.
 Each eval run starts from fresh memory seeded with the fixtures' history.
-`MEMORY_ENABLED=false` is the stateless baseline: no history search, no
-history or facts in the account record, nothing written.
+`MEMORY_ENABLED=false` is the stateless baseline: the same tools and fields,
+with the history search and the account history coming back empty, and
+nothing written.
 
 ## Quickstart
 
@@ -227,7 +228,7 @@ Set in `.env` (see `.env.example`); the environment overrides the file.
 | `AGENT_MAX_TOKENS` | `50000` | input + output tokens per ticket |
 | `AGENT_MAX_WALL_CLOCK_SECONDS` | `120` | per ticket |
 | `TRA_VAR_DIR` | `var/` | where traces, audit logs and the write store go |
-| `MEMORY_ENABLED` | `true` | `false` keeps all customer history from the agent: the stateless baseline (ADR 0008) |
+| `MEMORY_ENABLED` | `true` | `false` empties all customer history the agent sees: the stateless baseline (ADR 0008) |
 | `LOG_LEVEL` | — | reserved; not read by any code yet |
 
 ## Layout

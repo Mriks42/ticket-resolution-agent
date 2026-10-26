@@ -44,7 +44,7 @@ Six choices were made with the label owner before the code:
 
 | question | choice | rejected |
 |---|---|---|
-| what "off" removes | all history: the search tool and `past_tickets` (and remembered facts) in the account | agent-written memory only, which leaves both arms identical on the 22; the search tool only, which leaks history through `lookup_customer` |
+| what "off" removes | all history: what the search returns and `past_tickets` (and remembered facts) in the account. First built by hiding the tool and the field; changed to emptying them after the measurement below | agent-written memory only, which leaves both arms identical on the 22; the search tool only, which leaks history through `lookup_customer` |
 | how facts are extracted | deterministically, from the run's own records | an LLM at close, whose invented fact would be read back as the customer's own record |
 | search scope | the ticket's own customer only | cross-customer precedent, which needs a second grounding class to be safe |
 | when a run writes | at every terminal state | RESOLVE only, which leaves an escalated ticket with no record, since in an eval no human ever closes it |
@@ -57,11 +57,18 @@ Six choices were made with the label owner before the code:
 `true`, the name `.env.example` already reserved), and recorded in every
 `run_started` trace event. Off, the loop:
 
-- does not offer `search_past_tickets` to the model, and treats a call to it
-  as an unknown tool: an invalid call, not executed, not audited;
-- removes `past_tickets` and `memory` from the `lookup_customer` result before
-  either the model or the guardrail sees it;
+- offers the same tools, but a `search_past_tickets` result reaches the model
+  with no matches;
+- empties `past_tickets` in the `lookup_customer` result, keeping the field
+  where it was, and drops `memory`, before the model or the guardrail sees
+  either;
 - writes nothing at close.
+
+So for a customer with no history, the two arms see byte-identical input, and
+a test holds the loop to that. The first version hid the tool and removed the
+field instead. That changed every ticket's input, and the change alone moved
+outcomes (*Measured*). The searches still run and are audited; only what the
+model and the guardrail see is emptied.
 
 The account itself — plan, seats, billing cycle, last charge — is current
 state rather than memory, and stays in both arms. On is what every run did

@@ -1,11 +1,14 @@
 """Memory on and off inside the loop.
 
-Off is the stateless baseline of the memory ablation, so it has to be
-stateless in fact, not just missing a tool: the history search is not offered,
-a call to it is not run, and `lookup_customer` reaches neither the model nor
-the guardrail with the customer's past tickets in it, and nothing is written.
-On, every run is remembered at close — as the customer's words and a fixed
-outcome, never the model's prose. ADR 0008.
+Off is the stateless baseline of the memory ablation. It has to be stateless
+in fact — no history reaches the model or the guardrail, and nothing is
+written — and it has to change nothing else. The first version hid the
+history tool and the `past_tickets` field, and that interface change alone
+flipped a ticket with no history three runs out of three. So off keeps the
+same tools and the same fields and empties them: for a customer with no
+history, the two arms see byte-identical input. On, every run is remembered
+at close, as the customer's words and a fixed outcome, never the model's
+prose. ADR 0008.
 """
 
 from __future__ import annotations
@@ -38,37 +41,62 @@ def escalate(ticket: Ticket):
 
 
 @pytest.mark.asyncio
-async def test_memory_off_does_not_offer_the_history_search(make, ticket) -> None:
+async def test_memory_off_offers_the_same_tools(make, ticket) -> None:
     llm = ScriptedLLM(escalate(ticket))
     await make(llm, memory=False).run(ticket)
-    assert llm.tools_offered == [name for name in CATALOG if name != "search_past_tickets"]
+    assert llm.tools_offered == list(CATALOG)
 
 
 @pytest.mark.asyncio
-async def test_memory_off_does_not_run_a_history_search(make, ticket, server) -> None:
+async def test_memory_off_history_search_finds_nothing(make, ticket, server) -> None:
     llm = ScriptedLLM(
         completion("search_past_tickets", {"query": "slow response"}),
         escalate(ticket),
     )
-    result = await make(llm, memory=False).run(ticket)
+    await make(llm, memory=False).run(ticket)
 
-    assert json.loads(llm.last_observation(1))["error"] == "unknown_tool"
-    assert [r["tool"] for r in server.audit.records() if r["tool"] == "search_past_tickets"] == []
-    assert result.tool_calls[0].tool.value == "escalate"
+    assert json.loads(llm.last_observation(1)) == {
+        "query": "slow response", "customer_id": ticket.customer_id, "matches": [],
+    }
+    assert [r["tool"] for r in server.audit.records()][0] == "search_past_tickets"
 
 
 @pytest.mark.asyncio
-async def test_memory_off_strips_history_from_the_account(make, ticket) -> None:
+async def test_memory_off_shows_an_empty_history_in_the_same_place(make, ticket) -> None:
     llm = ScriptedLLM(
+        completion("lookup_customer", {"customer_id": ticket.customer_id}),
+        escalate(ticket),
         completion("lookup_customer", {"customer_id": ticket.customer_id}),
         escalate(ticket),
     )
     await make(llm, memory=False).run(ticket)
+    await make(llm).run(ticket)
 
-    account = json.loads(llm.last_observation(1))
-    assert "past_tickets" not in account
-    assert account["customer_id"] == ticket.customer_id
-    assert account["seats"] == 6
+    off, on = json.loads(llm.last_observation(1)), json.loads(llm.last_observation(3))
+    assert off["past_tickets"] == []
+    assert on["past_tickets"]
+    assert list(off) == list(on)[: len(off)]
+    assert {k: v for k, v in off.items() if k != "past_tickets"} == {
+        k: v for k, v in on.items() if k not in ("past_tickets", "memory")
+    }
+
+
+@pytest.mark.asyncio
+async def test_without_history_both_arms_see_identical_input(make, tickets) -> None:
+    """The point of the ablation: where there is no history, the switch must
+    change nothing the model sees."""
+    t = tickets["T-022"]  # CUST-1867: no history; flipped 3/3 under the first off arm
+    script = lambda: [  # noqa: E731 - one script, run twice
+        completion("lookup_customer", {"customer_id": t.customer_id}),
+        completion("search_past_tickets", {"query": "renewal charge"}),
+        escalate(t),
+    ]
+    on, off = ScriptedLLM(*script()), ScriptedLLM(*script())
+    await make(on).run(t)
+    await make(off, memory=False).run(t)
+
+    assert on.tools_offered == off.tools_offered
+    assert [on.last_observation(i) for i in (1, 2)] == [off.last_observation(i) for i in (1, 2)]
 
 
 @pytest.mark.asyncio
@@ -182,7 +210,7 @@ async def test_memory_off_hides_what_an_earlier_run_remembered(make, tickets) ->
     await make(llm, memory=False).run(second)
 
     account = json.loads(llm.last_observation(1))
-    assert "past_tickets" not in account
+    assert account["past_tickets"] == []
     assert "memory" not in account
 
 
