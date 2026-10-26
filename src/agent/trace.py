@@ -18,6 +18,9 @@ depends on the event:
     memory_written namespace, episode — once per run, at close, memory on only
     run_finished   final_state, outcome, stop_reason, steps, tokens,
                    cost_usd (LLM only), embedding_cost_usd, elapsed_s
+    approval_decided  approval_id, status (approved | rejected | failed),
+                   decided_by, note, executed — after the run, by a human
+                   through the API (ADR 0012)
 
 The MCP audit log (`src/mcp/audit.py`) is a separate file with a separate
 job: it records every tool call the *server* saw. The trace records what the
@@ -35,7 +38,7 @@ from typing import Any
 EVENTS = frozenset(
     {
         "run_started", "transition", "llm_call", "observation", "guardrail", "gate",
-        "escalation_filed", "memory_written", "run_finished",
+        "escalation_filed", "memory_written", "run_finished", "approval_decided",
     }
 )
 

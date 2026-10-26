@@ -125,6 +125,19 @@ Each eval run starts from fresh memory seeded with the fixtures' history.
 with the history search and the account history coming back empty, and
 nothing written.
 
+**The API** ([ADR 0012](docs/adr/0012-api-service.md)) puts the same agent
+behind FastAPI. `POST /tickets` queues a run and returns 202 with its id. Runs
+execute one at a time, and `GET /runs/{id}` returns the result and the trace. A
+run that ends waiting for approval opens an approval. `POST /approvals/{id}`
+approves it, executing the held refund and then the held reply through the
+write-scoped server, or rejects it, executing nothing. There are two keys: the
+key that submits tickets cannot approve them.
+
+```sh
+TRA_API_KEY_SUBMIT=... TRA_API_KEY_APPROVE=... \
+    uv run uvicorn src.api.app:create_app_from_env --factory
+```
+
 ## Quickstart
 
 Requirements: Python 3.11, [uv](https://docs.astral.sh/uv/), and Docker for
@@ -248,7 +261,7 @@ src/
   tools/      tool implementations, retrieval backends, embeddings
   mcp/        MCP server, permission scopes, audit log
   memory/     episodic and semantic stores, written at close
-  api/        (not built yet)
+  api/        FastAPI service: tickets, runs, approvals
 evals/
   dataset/    tickets, policy corpus, customers, probes, guardrail cases
   generate/   (empty: no synthetic generator yet)
@@ -277,7 +290,7 @@ waiting for label review.
 Not built yet:
 
 - the rest of the synthetic expansion (batches 2-6, after batch 1's review)
-- the FastAPI service and Terraform for AWS
+- Terraform for AWS
 
 ## Design decisions
 
@@ -294,3 +307,4 @@ Not built yet:
 | [0009](docs/adr/0009-cost-and-latency-metrics.md) | cost and latency per resolved ticket |
 | [0010](docs/adr/0010-synthetic-dataset.md) | the synthetic dataset: hand-written specs, generated wording, reviewed labels |
 | [0011](docs/adr/0011-refund-history-in-the-gate.md) | refund history in the gate (REF-002.4), as account state |
+| [0012](docs/adr/0012-api-service.md) | the API: background runs, approvals, two keys |
