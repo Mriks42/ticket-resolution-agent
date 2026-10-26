@@ -2,10 +2,10 @@
 
 ## Status
 
-Accepted. Built on branch `memory-layer` and measured once on the held-out
-set, 2026-10-26. What that can show is limited by construction (*What this
-can measure*), and the measurement exposed a confound in the off arm that is
-still open (*Measured*).
+Accepted. Built and measured on the held-out set, 2026-10-26. What that can
+show is limited by construction (*What this can measure*). The first
+measurement exposed a confound in the off arm; the off arm was changed and
+measured again (*Measured*).
 
 ## Context
 
@@ -198,10 +198,27 @@ bootstrap CI. LLM cost excludes the embedding calls memory makes.
   So the off arm as built measures history *and* a changed interface, and the
   interface change alone moved one ticket three times out of three.
 
-An off arm that keeps the interface — the tool still offered, history and
-facts empty — would make the two arms' inputs identical except where history
-exists, so any difference would be memory's. Whether to change the off arm to
-that is open with the project owner.
+**The off arm was changed to keep the interface** — the tool still offered,
+history and facts emptied in place — so the two arms' inputs are identical
+except where history exists, and any difference is memory's. Three new off
+runs (`memory_off_v2_run1..3.json`) against the same three on runs:
+
+| | on | off, second version |
+|---|---|---|
+| resolution rate, per run | 0.318, 0.364, 0.364 | 0.318, 0.318, 0.364 |
+| pending-approval rate, per run | 0.136, 0.136, 0.136 | 0.182, 0.136, 0.136 |
+| escalation precision, mean | 0.679 | 0.679 |
+| tool-call precision, mean | 0.776 | 0.784 |
+| hallucinated-policy rate | 0 in every run | 0 in every run |
+| tickets whose outcome differs between runs | 1 of 22 | 2 of 22 |
+| LLM cost per run | $0.0172 | $0.0178 |
+
+T-022 is now pending_approval in all six runs. The arms' majority outcomes
+agree on every ticket except T-008 and T-021, and both of those also
+disagree between runs of the same arm. The three tickets with history come
+out the same as before. This is the null result the held-out set allows: the
+switch works and changes nothing else. Whether memory helps needs the
+history-dependent tickets of Session 8.
 
 ## What it costs
 
