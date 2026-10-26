@@ -14,18 +14,24 @@ import asyncio
 import json
 import re
 import shutil
+from datetime import date
 
 import pytest
 
 from evals.generate.build import build_batch
 from evals.generate.checks import problems
-from evals.generate.scenarios import BATCH_1, REGISTERS, REQUESTERS, Spec
+from evals.generate.scenarios import BATCH_1, BATCHES, REGISTERS, REQUESTERS, Spec
 from evals.generate.writer import Draft
 from evals.loader import CUSTOMERS_PATH, POLICY_DIR, load_policy_ids, load_synthetic
+from evals.generate.scenarios import TODAY
 from evals.schema import Outcome, Tool
+from src.agent.gate import recent_refunds as recent
 from src.tools.context import ToolContext
 from src.tools.policy import load_clauses
 from src.tools.retrieval import RetrievalConfig
+
+#: Every spec in every batch: the conventions hold for all of them.
+ALL_SPECS = [spec for batch in BATCHES.values() for spec in batch]
 
 FILLER = "Hello, could you help with this for us, thank you very much for taking a look at it today."
 
@@ -55,56 +61,74 @@ def entries(path) -> list[dict]:
 
 
 def test_spec_keys_registers_and_requesters_are_valid() -> None:
-    assert len({s.key for s in BATCH_1}) == len(BATCH_1) == 25
-    for spec in BATCH_1:
+    assert len({s.key for s in ALL_SPECS}) == len(ALL_SPECS)
+    assert all(len(batch) == 25 for batch in BATCHES.values())
+    for spec in ALL_SPECS:
         assert spec.register in REGISTERS, spec.key
         assert spec.requester in REQUESTERS, spec.key
 
 
 def test_every_cited_policy_and_clause_exists() -> None:
     policies, clauses = load_policy_ids(), {c.clause_id for c in load_clauses()}
-    for spec in BATCH_1:
+    for spec in ALL_SPECS:
         assert set(spec.policy_ids) <= policies, spec.key
         cited = set(re.findall(r"\b[A-Z]{3}-\d{3}\.\d+\b", spec.rationale))
         assert cited <= clauses, (spec.key, cited - clauses)
 
 
-def test_a_held_refund_is_an_owner_in_window_refund_above_the_ceiling() -> None:
-    for spec in BATCH_1:
+def recent_refunds(spec: Spec) -> int:
+    return recent(spec.refunds, date.fromisoformat(TODAY))
+
+
+def test_a_held_refund_is_an_owner_in_window_refund_the_gate_holds() -> None:
+    """Above the self-serve ceiling, or under it with two refunds in the
+    preceding 12 months (REF-002.4)."""
+    for spec in ALL_SPECS:
         if spec.outcome is Outcome.PENDING_APPROVAL:
             assert spec.requester == "owner", spec.key
-            assert spec.last_charge_usd > 50, spec.key
+            assert spec.last_charge_usd > 50 or recent_refunds(spec) >= 2, spec.key
             assert spec.expected_tools[-1] is Tool.ISSUE_REFUND, spec.key
             assert any("day" in o or "week" in o for opts in spec.must_mention for o in opts), (
                 f"{spec.key}: the agent has no clock, so the message must say how long ago"
             )
 
 
-def test_a_refund_that_resolves_is_within_the_self_serve_ceiling() -> None:
-    for spec in BATCH_1:
+def test_a_refund_that_resolves_is_one_the_gate_executes() -> None:
+    for spec in ALL_SPECS:
         if spec.outcome is Outcome.RESOLVE and Tool.ISSUE_REFUND in spec.expected_tools:
             assert spec.last_charge_usd <= 50, spec.key
+            assert recent_refunds(spec) < 2, spec.key
+
+
+def test_refund_history_sits_well_inside_or_outside_the_window() -> None:
+    """The gate uses the real date and the eval world's is 2026-08-24 (ADR
+    0011): a refund must count the same under both, months either way."""
+    for spec in ALL_SPECS:
+        for later in ("2026-08-24", "2026-12-31"):
+            assert recent(spec.refunds, date.fromisoformat(later)) == recent_refunds(spec), spec.key
 
 
 def test_a_non_owner_resolves_only_a_general_question() -> None:
-    for spec in BATCH_1:
+    for spec in ALL_SPECS:
         if spec.requester != "owner" and spec.outcome is not Outcome.ESCALATE:
             assert set(spec.expected_tools) == {Tool.RETRIEVE_POLICY, Tool.SEND_REPLY}, spec.key
 
 
 def test_history_dependent_specs_carry_their_history() -> None:
-    keys = [s.key for s in BATCH_1]
-    for spec in BATCH_1:
-        if "history" in spec.tags and "antecedent" not in spec.tags:
-            assert Tool.SEARCH_PAST_TICKETS in spec.expected_tools, spec.key
-            assert spec.past_tickets or spec.depends_on, spec.key
-        if spec.depends_on:
-            assert keys.index(spec.depends_on) < keys.index(spec.key), spec.key
+    for batch in BATCHES.values():
+        keys = [s.key for s in batch]
+        for spec in batch:
+            if "history" in spec.tags and "antecedent" not in spec.tags:
+                assert Tool.SEARCH_PAST_TICKETS in spec.expected_tools, spec.key
+                assert spec.past_tickets or spec.depends_on, spec.key
+            if spec.depends_on:
+                assert keys.index(spec.depends_on) < keys.index(spec.key), spec.key
 
 
 def test_the_messy_end_is_sampled_deliberately() -> None:
-    rough = sum(s.register in ("messy", "buried") for s in BATCH_1)
-    assert rough / len(BATCH_1) >= 0.4
+    for batch in BATCHES.values():
+        rough = sum(s.register in ("messy", "buried") for s in batch)
+        assert rough / len(batch) >= 0.4
 
 
 # --- checks -----------------------------------------------------------------------

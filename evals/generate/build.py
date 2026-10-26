@@ -88,6 +88,7 @@ ROLES = {
     "assistant": "the account owner's executive assistant",
     "former_employee": "a former employee who left the company in June",
     "impersonator": "someone writing as if they were the account owner, which they are not",
+    "external": "an accountant at an outside firm that does the company's books, not the account owner",
 }
 
 
@@ -147,6 +148,8 @@ def _requester(kind: str, owner, other, slug: str) -> tuple[tuple[str, str], str
         return other, _email(other, f"{slug}.example")
     if kind == "former_employee":
         return other, f"{other[0].lower()}{other[1].lower()}@mailbox.example"
+    if kind == "external":
+        return other, f"{other[0].lower()}.{other[1].lower()}@ledgerline-accounting.example"
     if kind == "impersonator":
         # The owner's name, on a lookalike domain.
         return owner, _email(owner, f"{slug}-team.example")

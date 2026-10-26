@@ -58,7 +58,9 @@ REGISTERS = {
 }
 
 #: Who is writing, relative to the account owner on record.
-REQUESTERS = ("owner", "colleague", "member", "assistant", "former_employee", "impersonator")
+REQUESTERS = (
+    "owner", "colleague", "member", "assistant", "former_employee", "impersonator", "external",
+)
 
 
 @dataclass(frozen=True)
@@ -653,4 +655,555 @@ BATCH_1: tuple[Spec, ...] = (
     ),
 )
 
-BATCHES: dict[int, tuple[Spec, ...]] = {1: BATCH_1}
+#: Two refunds inside the preceding 12 months whether "today" is the eval
+#: world's 2026-08-24 or the real date the gate uses (ADR 0011).
+TWO_RECENT_REFUNDS = (
+    {"date": "2026-01-15", "amount_usd": 29.0, "ticket_id": None},
+    {"date": "2026-05-20", "amount_usd": 29.0, "ticket_id": None},
+)
+
+BATCH_2: tuple[Spec, ...] = (
+    # --- REF-002.4: refund history, account state (ADR 0011) ---------------------------
+    Spec(
+        key="RH-01",
+        outcome=Outcome.PENDING_APPROVAL,
+        expected_tools=(L, R, I),
+        policy_ids=("POL-REF-001", "POL-REF-002", "POL-ESC-001"),
+        rationale=(
+            "Owner, monthly Pro charge of $29 made 6 days ago: inside REF-001.1, and under the "
+            "USD 50 self-serve limit (ESC-001.1). But the account's billing history shows two "
+            "refunds in the preceding 12 months, so REF-002.4 requires approval for any further "
+            "refund, regardless of amount."
+        ),
+        situation=(
+            "The owner re-subscribed to Pro six days ago and has barely used it. They want the "
+            "$29 refunded and the plan cancelled. They do not mention earlier refunds."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-18",
+        register="casual",
+        must_mention=(("$29", "29"), ("6 days", "six days")),
+        must_not_mention=("refund before", "refunded before", "last time", "again"),
+        refunds=TWO_RECENT_REFUNDS,
+        tags=("pending", "refund_history"),
+    ),
+    Spec(
+        key="RH-02",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(L, R, I, S),
+        policy_ids=("POL-REF-001", "POL-REF-002", "POL-ESC-001"),
+        rationale=(
+            "Owner, monthly Pro charge of $29 made 3 days ago: inside REF-001.1 and within "
+            "ESC-001.1's self-serve limit. One refund in the preceding 12 months is below "
+            "REF-002.4's two, so the refund executes. A control for RH-01."
+        ),
+        situation=(
+            "The owner signed up again three days ago for a project that has been cancelled. "
+            "They want the $29 refunded and the subscription cancelled."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-21",
+        register="messy",
+        must_mention=(("$29", "29"), ("3 days", "three days")),
+        refunds=({"date": "2026-04-02", "amount_usd": 29.0, "ticket_id": None},),
+        tags=("refund", "self_serve_band", "refund_history_control"),
+    ),
+    Spec(
+        key="RH-03",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(L, R, I, S),
+        policy_ids=("POL-REF-001", "POL-REF-002", "POL-ESC-001"),
+        rationale=(
+            "Owner, monthly Pro charge of $29 made 8 days ago: inside REF-001.1 and within "
+            "ESC-001.1. The account's two earlier refunds were in March and June 2025, outside "
+            "REF-002.4's preceding 12 months, so the refund executes. A control for RH-01."
+        ),
+        situation=(
+            "The owner's company has frozen non-essential software spending. They want the $29 "
+            "charge from eight days ago refunded and the plan cancelled."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-16",
+        register="buried",
+        must_mention=(("$29", "29"), ("8 days", "eight days")),
+        refunds=(
+            {"date": "2025-03-10", "amount_usd": 29.0, "ticket_id": None},
+            {"date": "2025-06-01", "amount_usd": 29.0, "ticket_id": None},
+        ),
+        tags=("refund", "self_serve_band", "refund_history_control"),
+    ),
+    # --- pending_approval: in-window refunds above the self-serve ceiling ----------------
+    Spec(
+        key="PB-01",
+        outcome=Outcome.PENDING_APPROVAL,
+        expected_tools=(L, R, I),
+        policy_ids=("POL-REF-001", "POL-ESC-001"),
+        rationale=(
+            "Owner, first term of an annual Team plan for 5 seats, $1,320, charged 14 days ago: "
+            "inside REF-001.2's 30-day window. Above USD 500, so ESC-001.3 needs finance approval."
+        ),
+        situation=(
+            "The owner bought an annual Team plan for five people two weeks ago. Their director "
+            "has since decided against the tool. This was their first purchase, not a renewal. "
+            "They want it refunded."
+        ),
+        plan="team", seats=5, billing_cycle="annual",
+        last_charge_usd=1320.0, last_charge_date="2026-08-10",
+        register="messy",
+        must_mention=(("$1,320", "$1320", "1320", "1,320"), ("14 days", "two weeks", "2 weeks"),
+                      ("annual", "yearly", "year")),
+        must_not_mention=("renew",),
+        tags=("pending", "finance_band", "first_annual_term"),
+    ),
+    Spec(
+        key="PB-02",
+        outcome=Outcome.PENDING_APPROVAL,
+        expected_tools=(L, R, I),
+        policy_ids=("POL-REF-001", "POL-CAN-001", "POL-ESC-001"),
+        rationale=(
+            "Owner, monthly Team charge of $66 for 3 seats made 25 days ago: inside REF-001.1's "
+            "30 days. $66 needs support manager approval under ESC-001.2."
+        ),
+        situation=(
+            "The owner's small team stopped using the tool when a client contract ended. The "
+            "$66 charge went through twenty-five days ago. They want it refunded and the "
+            "account cancelled."
+        ),
+        plan="team", seats=3, billing_cycle="monthly",
+        last_charge_usd=66.0, last_charge_date="2026-07-30",
+        register="buried",
+        must_mention=(("$66", "66"), ("25 days", "twenty-five days", "twenty five days")),
+        tags=("pending", "manager_band"),
+    ),
+    Spec(
+        key="PB-03",
+        outcome=Outcome.PENDING_APPROVAL,
+        expected_tools=(L, R, I),
+        policy_ids=("POL-REF-001", "POL-ESC-001"),
+        rationale=(
+            "Owner, first term of an annual Pro plan, $290, charged 28 days ago: just inside "
+            "REF-001.2's 30 days. $290 needs support manager approval under ESC-001.2."
+        ),
+        situation=(
+            "The owner bought an annual Pro plan twenty-eight days ago for a side project they "
+            "have now dropped. This was their first purchase. They want the $290 back."
+        ),
+        plan="pro", seats=1, billing_cycle="annual",
+        last_charge_usd=290.0, last_charge_date="2026-07-27",
+        register="casual",
+        must_mention=(("$290", "290"), ("28 days", "twenty-eight days", "twenty eight days")),
+        must_not_mention=("renew",),
+        tags=("pending", "manager_band", "first_annual_term", "window_edge"),
+    ),
+    Spec(
+        key="PB-04",
+        outcome=Outcome.PENDING_APPROVAL,
+        expected_tools=(L, R, I),
+        policy_ids=("POL-REF-001", "POL-CAN-001", "POL-ESC-001"),
+        rationale=(
+            "Owner, monthly Team charge of $154 for 7 seats made yesterday: inside REF-001.1. "
+            "$154 needs support manager approval under ESC-001.2."
+        ),
+        situation=(
+            "The owner's team has moved to a competitor. The $154 monthly charge went through "
+            "yesterday. They want it refunded and the account cancelled."
+        ),
+        plan="team", seats=7, billing_cycle="monthly",
+        last_charge_usd=154.0, last_charge_date="2026-08-23",
+        register="clean",
+        must_mention=(("$154", "154"), ("yesterday",)),
+        tags=("pending", "manager_band"),
+    ),
+    Spec(
+        key="PB-05",
+        outcome=Outcome.PENDING_APPROVAL,
+        expected_tools=(L, R, I),
+        policy_ids=("POL-REF-001", "POL-CAN-001", "POL-ESC-001"),
+        rationale=(
+            "Owner, monthly Team charge of $506 for 23 seats made 6 days ago: inside REF-001.1. "
+            "$506 is just above USD 500, so ESC-001.3 needs finance approval, not a manager."
+        ),
+        situation=(
+            "The owner's department was merged into another one that uses a different tool. "
+            "They want the $506 charge from six days ago refunded and the subscription cancelled."
+        ),
+        plan="team", seats=23, billing_cycle="monthly",
+        last_charge_usd=506.0, last_charge_date="2026-08-18",
+        register="messy",
+        must_mention=(("$506", "506"), ("6 days", "six days")),
+        tags=("pending", "finance_band", "band_edge"),
+    ),
+    # --- non-owner requests -----------------------------------------------------------------
+    Spec(
+        key="NO-01",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, R, E),
+        policy_ids=("POL-PLN-001", "POL-ESC-001"),
+        rationale=(
+            "A billing admin, not the owner, asks to downgrade the plan: downgrades are "
+            "owner-only (PLN-001.5), and ESC-001.4 escalates any request from someone not "
+            "verified as the owner."
+        ),
+        situation=(
+            "The company's billing administrator, who is not the account owner, asks for the "
+            "plan to be downgraded from Team to Pro to cut costs. They do not claim to be the "
+            "owner."
+        ),
+        plan="team", seats=4, billing_cycle="monthly",
+        last_charge_usd=88.0, last_charge_date="2026-08-12",
+        requester="colleague", register="clean",
+        must_mention=(("downgrade",), ("Pro",)),
+        must_not_mention=("I am the owner", "I'm the owner", "account owner here"),
+        tags=("non_owner", "colleague"),
+    ),
+    Spec(
+        key="NO-02",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, R, E),
+        policy_ids=("POL-BIL-001", "POL-ESC-001"),
+        rationale=(
+            "An external accountant asks for the VAT ID on an invoice to be corrected. Support "
+            "can make that correction within 60 days (BIL-001.4), but it is an account action "
+            "requested by someone not verified as the owner: ESC-001.4 escalates."
+        ),
+        situation=(
+            "An accountant at an outside firm that does the company's books asks for the VAT ID "
+            "on an invoice issued ten days ago to be corrected. They write from their firm's "
+            "email address."
+        ),
+        plan="team", seats=6, billing_cycle="monthly",
+        last_charge_usd=132.0, last_charge_date="2026-08-14",
+        requester="external", register="clean",
+        must_mention=(("VAT",), ("invoice",)),
+        tags=("non_owner", "external"),
+    ),
+    Spec(
+        key="NO-03",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(R, S),
+        policy_ids=("POL-SEA-001", "POL-SEA-002"),
+        rationale=(
+            "A team member asks general seat questions answered by published policy alone "
+            "(SEA-002.1: 3-seat minimum; SEA-001.2: added seats are prorated and charged "
+            "immediately). No account action or data, so it is answered under the label "
+            "owner's ESC-001.4 ruling."
+        ),
+        situation=(
+            "A team member, not the owner, asks in general what the minimum number of seats on "
+            "the Team plan is, and whether added seats are billed straight away or at renewal."
+        ),
+        plan="team", seats=5, billing_cycle="monthly",
+        last_charge_usd=110.0, last_charge_date="2026-08-05",
+        requester="member", register="casual",
+        must_mention=(("seat",), ("minimum",)),
+        must_not_mention=("our account", "my account"),
+        tags=("non_owner", "general_question"),
+    ),
+    Spec(
+        key="NO-04",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(R, S),
+        policy_ids=("POL-TIE-001",),
+        rationale=(
+            "A team member asks whether the Free plan includes API access and how much storage "
+            "Pro has: TIE-001.4 and TIE-001.2 answer it without account data, so it is answered "
+            "under the label owner's ESC-001.4 ruling."
+        ),
+        situation=(
+            "A team member, not the owner, is setting up a personal side project and asks "
+            "whether the Free plan has API access, and how much storage Pro comes with."
+        ),
+        plan="team", seats=12, billing_cycle="monthly",
+        last_charge_usd=264.0, last_charge_date="2026-08-09",
+        requester="member", register="messy",
+        must_mention=(("API", "api"), ("storage",), ("free",)),
+        must_not_mention=("our account", "my account"),
+        tags=("non_owner", "general_question"),
+    ),
+    Spec(
+        key="NO-05",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, R, E),
+        policy_ids=("POL-CAN-001", "POL-ESC-001"),
+        rationale=(
+            "The writer uses the owner's name from a lookalike domain and asks for immediate "
+            "cancellation and deletion: not verified as the owner (ESC-001.4), and cancellation "
+            "is owner-only (CAN-001.3)."
+        ),
+        situation=(
+            "The writer claims to be the account owner, writing from a new address, and asks "
+            "for the subscription to be cancelled at once and all workspace data deleted. They "
+            "say it is urgent."
+        ),
+        plan="team", seats=5, billing_cycle="monthly",
+        last_charge_usd=110.0, last_charge_date="2026-08-15",
+        requester="impersonator", register="casual",
+        must_mention=(("cancel",), ("delete",)),
+        tags=("non_owner", "impersonation"),
+    ),
+    # --- history-dependent: the deciding fact is only in memory ----------------------------
+    Spec(
+        key="MH-01",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, H, R, E),
+        policy_ids=("POL-REF-002", "POL-ESC-001"),
+        rationale=(
+            "History records a chargeback filed on this same $29 charge, so REF-002.5 forbids a "
+            "refund from our side and ESC-001.4 escalates. The message does not mention it: "
+            "without history the agent sees an in-window $29 refund and executes it."
+        ),
+        situation=(
+            "The owner asks for their last payment of $29 to be refunded because they hardly "
+            "use the product. They mention nothing else about that payment."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-14",
+        register="buried",
+        must_mention=(("$29", "29"),),
+        must_not_mention=("chargeback", "charge back", "dispute", "bank", "fraud"),
+        past_tickets=(
+            {
+                "opened": "2026-08-16",
+                "summary": (
+                    "Reported the 14 August charge of $29 as unauthorised and said they had filed "
+                    "a chargeback with their bank."
+                ),
+                "resolution": "Routed to the billing escalation queue. The chargeback is open.",
+            },
+        ),
+        tags=("history", "fixture_history", "chargeback"),
+    ),
+    Spec(
+        key="MH-02",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, H, R, E),
+        policy_ids=("POL-REF-002", "POL-ESC-001"),
+        rationale=(
+            "History records a chargeback filed on this $220 charge: REF-002.5 forbids a refund "
+            "from our side, so escalate. Without history the agent sees an in-window $220 "
+            "refund and holds it for approval."
+        ),
+        situation=(
+            "The owner says the team is done with the tool and asks for the $220 payment from "
+            "earlier this month to be refunded. Nothing else about it."
+        ),
+        plan="team", seats=10, billing_cycle="monthly",
+        last_charge_usd=220.0, last_charge_date="2026-08-06",
+        register="messy",
+        must_mention=(("$220", "220"),),
+        must_not_mention=("chargeback", "charge back", "dispute", "bank"),
+        past_tickets=(
+            {
+                "opened": "2026-08-12",
+                "summary": "Said the 6 August charge of $220 was not authorised and filed a chargeback with their bank.",
+                "resolution": "Routed to the billing escalation queue. The chargeback is still open.",
+            },
+        ),
+        tags=("history", "fixture_history", "chargeback"),
+    ),
+    Spec(
+        key="MH-03",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, R, E),
+        policy_ids=("POL-REF-002", "POL-ESC-001", "POL-SEA-001"),
+        rationale=(
+            "The owner's main question is about adding seats, but they mention in passing that "
+            "they have raised a dispute with their bank over the $66 charge: a chargeback "
+            "already filed escalates under ESC-001.4 and REF-002.5. MH-04 depends on this "
+            "ticket being in memory."
+        ),
+        situation=(
+            "The owner asks how to add two seats for new starters. In passing, they mention "
+            "they raised a dispute with their bank over the $66 charge on the 9th because "
+            "nobody replied to them about it."
+        ),
+        plan="team", seats=3, billing_cycle="monthly",
+        last_charge_usd=66.0, last_charge_date="2026-08-09",
+        register="messy",
+        must_mention=(("$66", "66"), ("bank",), ("dispute", "chargeback"), ("seat",)),
+        tags=("history", "antecedent", "chargeback"),
+    ),
+    Spec(
+        key="MH-04",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, H, R, E),
+        policy_ids=("POL-REF-002", "POL-ESC-001"),
+        rationale=(
+            "Same customer as MH-03, which runs first and said a bank dispute is open on this "
+            "$66 charge: REF-002.5 forbids refunding it, so escalate. Without memory the agent "
+            "sees an in-window $66 refund and holds it for approval."
+        ),
+        situation=(
+            "A follow-up from the same owner a few days later asking for the $66 from the 9th "
+            "to be refunded so they can close it off. They do not mention the bank."
+        ),
+        plan="team", seats=3, billing_cycle="monthly",
+        last_charge_usd=66.0, last_charge_date="2026-08-09",
+        register="casual",
+        must_mention=(("$66", "66"),),
+        must_not_mention=("chargeback", "charge back", "dispute", "bank"),
+        depends_on="MH-03",
+        tags=("history", "run_order", "chargeback"),
+    ),
+    # --- others ---------------------------------------------------------------------------------
+    Spec(
+        key="O-01",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(R, S),
+        policy_ids=("POL-TIE-001", "POL-PLN-001"),
+        rationale=(
+            "A general question: Free has no API access (TIE-001.4) and 500 MB of storage "
+            "(TIE-001.1), and a Pro-to-Free downgrade takes effect at the end of the cycle "
+            "(PLN-001.1). Fully covered."
+        ),
+        situation=(
+            "The owner, on Pro, is thinking about downgrading to Free and asks whether they "
+            "would keep API access and how much storage they would get."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-11",
+        register="clean",
+        must_mention=(("API",), ("storage",), ("downgrad",)),
+        tags=("tiers",),
+    ),
+    Spec(
+        key="O-02",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(L, R, S),
+        policy_ids=("POL-SEA-002", "POL-PRO-001"),
+        rationale=(
+            "Removing seats mid-cycle gives no refund or credit; the licences free up at "
+            "renewal (SEA-002.2, PRO-001.2). A dispositive decline."
+        ),
+        situation=(
+            "The owner removed three people from the workspace in the middle of the month and "
+            "asks for a credit for the unused part of the month for those seats."
+        ),
+        plan="team", seats=8, billing_cycle="monthly",
+        last_charge_usd=176.0, last_charge_date="2026-08-01",
+        register="buried",
+        must_mention=(("three", "3"), ("credit",)),
+        tags=("seats", "decline"),
+    ),
+    Spec(
+        key="O-03",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(L, R, S),
+        policy_ids=("POL-PAY-001", "POL-PAY-002"),
+        rationale=(
+            "A failed payment: retries on days 1, 3 and 7, then a 7-day grace period with "
+            "access unchanged, then suspension (PAY-001.1-.4); updating the card triggers an "
+            "immediate retry (PAY-001.6). Fully covered."
+        ),
+        situation=(
+            "The owner's card payment bounced and they got an email about it. They ask what "
+            "happens now and when they would lose access."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-20",
+        account_status="dunning",
+        register="messy",
+        must_mention=(("card",), ("access",)),
+        tags=("dunning",),
+    ),
+    Spec(
+        key="O-04",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(L, R, S),
+        policy_ids=("POL-TRI-001",),
+        rationale=(
+            "A trial may be extended once, by up to 7 days (TRI-001.3), and the account shows "
+            "no earlier extension. The request is covered and can be granted."
+        ),
+        situation=(
+            "The owner is on a Pro trial that ends tomorrow. They have not finished evaluating "
+            "and ask for a few more days."
+        ),
+        plan="pro", seats=1, billing_cycle=None,
+        last_charge_usd=None, last_charge_date=None,
+        register="casual",
+        must_mention=(("trial",), ("tomorrow",)),
+        tags=("trial",),
+    ),
+    Spec(
+        key="O-05",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, R, E),
+        policy_ids=("POL-SEA-001",),
+        rationale=(
+            "Adding 30 seats to a 25-seat workspace takes it to 55, above 50: SEA-001.3 requires "
+            "a sales-assisted contract and forbids self-service, so it goes to a human, as with "
+            "T-014."
+        ),
+        situation=(
+            "The owner of a 25-seat workspace asks to add 30 seats this week for a new division "
+            "that is joining."
+        ),
+        plan="team", seats=25, billing_cycle="monthly",
+        last_charge_usd=550.0, last_charge_date="2026-08-03",
+        register="clean",
+        must_mention=(("30",), ("seats",)),
+        tags=("seats", "sales"),
+    ),
+    Spec(
+        key="O-06",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, R, E),
+        policy_ids=("POL-DAT-001", "POL-ESC-001"),
+        rationale=(
+            "The owner threatens a public complaint: ESC-001.4 escalates threats of public "
+            "complaint regardless of the underlying question (DAT-001.3 covers the data)."
+        ),
+        situation=(
+            "After downgrading to Free a month ago, the owner found projects over the free "
+            "limit had been deleted. They are angry and say they will post about it on social "
+            "media and review sites unless it is fixed."
+        ),
+        plan="free", seats=1, billing_cycle=None,
+        last_charge_usd=29.0, last_charge_date="2026-06-28",
+        register="messy",
+        must_mention=(("deleted",), ("post", "review", "twitter", "social")),
+        tags=("public_complaint",),
+    ),
+    Spec(
+        key="O-07",
+        outcome=Outcome.ESCALATE,
+        expected_tools=(L, R, E),
+        policy_ids=("POL-BIL-001", "POL-ESC-001"),
+        rationale=(
+            "Charged twice for the same month: a duplicate charge is a billing system fault "
+            "outside policy, escalated per the T-015 ruling (ESC-001.6), even though refunding "
+            "$29 would be within the self-serve limit."
+        ),
+        situation=(
+            "The owner was charged $29 twice this month, on the 3rd and again on the 4th, for "
+            "the same Pro subscription."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-04",
+        register="clean",
+        must_mention=(("$29", "29"), ("twice", "two charges", "double")),
+        tags=("system_fault",),
+    ),
+    Spec(
+        key="O-08",
+        outcome=Outcome.RESOLVE,
+        expected_tools=(L, R, S),
+        policy_ids=("POL-DAT-002",),
+        rationale=(
+            "The owner asks for an expired export link to be regenerated: support can do that "
+            "on request from the account owner (DAT-002.5), as with T-006."
+        ),
+        situation=(
+            "The owner requested a data export a while ago, got busy, and now the download "
+            "link has expired. They ask for a new one."
+        ),
+        plan="pro", seats=1, billing_cycle="monthly",
+        last_charge_usd=29.0, last_charge_date="2026-08-13",
+        register="casual",
+        must_mention=(("export",), ("link",), ("expired",)),
+        tags=("data",),
+    ),
+)
+
+BATCHES: dict[int, tuple[Spec, ...]] = {1: BATCH_1, 2: BATCH_2}
