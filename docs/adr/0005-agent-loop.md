@@ -146,6 +146,56 @@ flipped. The model treats "policy says no" as "a human should decide". That is
 a prompt and behaviour question, to be worked on the synthetic set, not on these
 22.
 
+## Step-budget sweep (2026-10-26)
+
+CLAUDE.md's third required ablation: resolution rate and cost at a step budget
+of 4, 8 and 16. Three runs each on the 22 held-out tickets, at the default
+configuration (gpt-4o-mini, dense retrieval, guardrail blocking, memory on).
+The 8-step arm reuses the two runs from ADR 0009's first measurement, which
+had the same code on the same day, plus one more.
+
+```sh
+AGENT_MAX_STEPS=4  uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/steps4_run1.json
+AGENT_MAX_STEPS=16 uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/steps16_run1.json
+# ... run2, run3 likewise; steps8_run3.json at AGENT_MAX_STEPS=8
+uv run python -m evals.compare_runs --trace var/trace/trace.jsonl \
+    s4=evals/report/steps4_run1.json ... s8=evals/report/cost_latency_run1.json ... s16=...
+```
+
+| | 4 steps | 8 steps | 16 steps |
+|---|---|---|---|
+| resolution rate, per run | 0.364, 0.364, 0.364 | 0.318, 0.318, 0.318 | 0.318, 0.318, 0.364 |
+| pending-approval rate, mean | 0.061 | 0.152 | 0.136 |
+| cost per resolved ticket, mean | $0.00213 | $0.00247 | $0.00233 |
+| p50 latency per resolved ticket, mean | 3.64 s | 3.65 s | 3.71 s |
+| escalations filed by the system (budget or gate), over 66 tickets | 13 | 2 | 3 |
+
+Before the sweep, the traces of 110 runs at 8 steps showed no ticket using
+more than 6 steps (72 used 3, 23 used 4, 15 used 5 or 6). Tokens peaked
+around 1,750 per step, so the 50,000-token budget cannot bind first even at
+16 steps.
+
+- **16 is 8.** The budget is never reached, and the outcomes match within
+  run-to-run noise.
+- **4 cuts off legitimate work.** System-filed escalations rise from 2 to 13.
+  T-022 cannot reach its held refund in four steps and escalates in all
+  three runs, where its label says pending_approval. T-015 escalates for the
+  same reason, which happens to match its label.
+- **The higher resolution rate at 4 is not a budget effect.** It is all
+  T-008, which resolved in all three 4-step runs and escalated in all five
+  8-step runs and two of three 16-step runs. But T-008 takes three steps, so
+  no budget of 4 or more can touch it. The traces show byte-identical inputs
+  in every run: the same observations, prompt hash and token counts at each
+  call. Only the model's third output differs. That split is more lopsided
+  than chance would suggest, and it is unexplained, but it is provider-side
+  variation under identical requests, of the kind measured above.
+- 4 steps is about 14% cheaper per resolved ticket, all from the runs it cuts
+  short.
+
+**The default stays at 8.** It never binds on this set, while 4 truncates
+tickets the agent handles correctly. Session 8's larger set may contain
+tickets that need more than 6 steps; rerun the sweep there.
+
 ## Consequences
 
 - `AgentResult` gains `final_state` and `stop_reason` (optional, so the stub
@@ -162,7 +212,5 @@ a prompt and behaviour question, to be worked on the synthetic set, not on these
 
 - **Gate session:** band arithmetic and the owner check (above), and what a
   held refund followed by an escalation should become (T-021).
-- **Cost metric:** add embedding cost; report cost per *resolved* ticket.
-- **Latency:** p50/p95 per resolved ticket is in the trace (`elapsed_s`) but
-  not yet a metric in `evals/run.py`.
+- ~~**Cost metric**~~ and ~~**latency**~~: done in ADR 0009.
 - **Variance:** repeat runs per configuration before any comparison.
