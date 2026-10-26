@@ -264,6 +264,13 @@
         "summary": "Asked for a refund of the 13 August charge of $176 after deciding not to continue.",
         "resolution": "Refund of $176 approved by a support manager and issued to the original card on 19 August."
       }
+    ],
+    "refunds": [
+      {
+        "date": "2026-08-19",
+        "amount_usd": 176.0,
+        "ticket_id": null
+      }
     ]
   },
   "CUST-2124": {

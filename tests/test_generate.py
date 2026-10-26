@@ -169,6 +169,14 @@ def test_fixture_history_lands_in_the_customer_record(tmp_path) -> None:
     assert "chargeback" in past[0]["summary"]
 
 
+def test_billing_history_lands_in_the_customer_record(tmp_path) -> None:
+    by_key = {e["scenario"]: e for e in entries(build(tmp_path))}
+    customers = json.loads((tmp_path / "customers.json").read_text(encoding="utf-8"))
+    assert customers[by_key["H-02"]["ticket"]["customer_id"]]["refunds"] == [
+        {"date": "2026-08-19", "amount_usd": 176.0, "ticket_id": None},
+    ]
+
+
 def test_an_unreviewed_batch_never_enters_an_eval(tmp_path) -> None:
     path = build(tmp_path)
     assert load_synthetic(tmp_path) == []

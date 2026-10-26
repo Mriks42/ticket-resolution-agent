@@ -84,6 +84,9 @@ class Spec:
     #: The message must contain none of these.
     must_not_mention: tuple[str, ...] = ()
     past_tickets: tuple[dict, ...] = ()
+    #: Refunds the customer has received: billing history, which the account
+    #: record shows in both memory arms and the gate counts (ADR 0011).
+    refunds: tuple[dict, ...] = ()
     #: Key of an earlier spec whose ticket must run first, for the same
     #: customer: this one's label depends on what memory kept from it. The
     #: build gives both the same customer and checks their accounts agree.
@@ -572,13 +575,15 @@ BATCH_1: tuple[Spec, ...] = (
     Spec(
         key="H-02",
         outcome=Outcome.RESOLVE,
-        expected_tools=(L, H, R, S),
+        expected_tools=(L, R, S),
         policy_ids=("POL-REF-001",),
         rationale=(
-            "History shows this $176 charge was already refunded on 19 August, three business "
-            "days ago; refunds settle in 5-10 business days (REF-001.5). The right answer "
-            "explains that, with no second refund. Without history the agent sees an in-window "
-            "$176 refund and holds it for approval."
+            "The account's billing history and its past tickets both show this $176 charge was "
+            "already refunded on 19 August, three business days ago; refunds settle in 5-10 "
+            "business days (REF-001.5). The right answer explains that, with no second refund. "
+            "Changed in review: the refund is in the account record, so the ticket tests "
+            "whether the agent notices an earlier refund, in both memory arms, rather than "
+            "testing memory."
         ),
         situation=(
             "The owner asks for their August payment of $176 to be refunded because they are "
@@ -600,7 +605,8 @@ BATCH_1: tuple[Spec, ...] = (
                 ),
             },
         ),
-        tags=("history", "fixture_history", "already_refunded"),
+        refunds=({"date": "2026-08-19", "amount_usd": 176.0, "ticket_id": None},),
+        tags=("already_refunded", "billing_history"),
     ),
     Spec(
         key="H-03",

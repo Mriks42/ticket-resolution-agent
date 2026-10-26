@@ -167,6 +167,7 @@ def customer_record(spec: Spec, assignment: Assignment, batch: int, index: int) 
             {"ticket_id": f"H-{batch}{index:02d}{j}", **past}
             for j, past in enumerate(spec.past_tickets, 1)
         ],
+        refunds=list(spec.refunds),
     )
 
 
