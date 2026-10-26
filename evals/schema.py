@@ -151,6 +151,10 @@ class AgentResult(BaseModel):
     cost_usd: float | None = None
     #: Wall clock from the run's start to its terminal state.
     elapsed_s: float | None = None
+    #: Gated actions waiting for a human, in the order they were held: each
+    #: {tool, args} plus the approver and clause for a refund. What an approval
+    #: carries out if granted (ADR 0012).
+    held: list[dict[str, Any]] = []
 
 
 @runtime_checkable

@@ -342,3 +342,27 @@ async def test_memory_off_does_not_change_what_the_gate_enforces(make, owner_tic
     llm = ScriptedLLM(refund(owner_ticket, 20), reply(owner_ticket, "Submitted for approval."))
     result = await make(llm, memory=False, today=lambda: TODAY).run(owner_ticket)
     assert result.outcome is Outcome.PENDING_APPROVAL
+
+
+# --- what a held run hands to a human (the API's approvals, ADR 0012) ----------------
+
+
+@pytest.mark.asyncio
+async def test_a_pending_result_carries_what_was_held(make, owner_ticket) -> None:
+    llm = ScriptedLLM(refund(owner_ticket, 176), reply(owner_ticket, "Submitted for approval (ESC-001.2)."))
+    result = await make(llm).run(owner_ticket)
+
+    assert result.outcome is Outcome.PENDING_APPROVAL
+    assert [(h["tool"], h.get("approver"), h.get("clause")) for h in result.held] == [
+        ("issue_refund", "support manager", "ESC-001.2"),
+        ("send_reply", None, None),
+    ]
+    assert result.held[0]["args"]["amount"] == 176
+
+
+@pytest.mark.asyncio
+async def test_a_run_can_take_its_id_from_the_caller(make, owner_ticket, trace) -> None:
+    llm = ScriptedLLM(completion("escalate", {"ticket_id": owner_ticket.ticket_id, "reason": "r"}))
+    result = await make(llm).run(owner_ticket, run_id="run-from-api")
+    assert result.run_id == "run-from-api"
+    assert trace.records("run-from-api")[0]["event"] == "run_started"

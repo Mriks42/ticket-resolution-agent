@@ -258,8 +258,21 @@ class AgentLoop:
         self._today = today
         self._schemas = tool_schemas()
 
-    async def run(self, ticket: Ticket) -> AgentResult:
-        run = _Run(run_id=f"run-{uuid.uuid4().hex[:12]}", ticket=ticket, started=self._clock())
+    @property
+    def trace(self) -> TraceLog:
+        return self._trace
+
+    @property
+    def writer(self) -> ToolExecutor:
+        """The write-scoped executor: only the gate, and a human approving what
+        the gate held (ADR 0012), dispatch to it."""
+        return self._writer
+
+    async def run(self, ticket: Ticket, *, run_id: str | None = None) -> AgentResult:
+        """`ticket` needs only the four fields `render_ticket` shows; labels,
+        when present, are never read. `run_id` lets a caller such as the API
+        hand out the id before the run starts."""
+        run = _Run(run_id=run_id or f"run-{uuid.uuid4().hex[:12]}", ticket=ticket, started=self._clock())
         run.messages = [System(self._prompt.text), User(render_ticket(ticket))]
         run.context.append(ticket.body)
         embedded_before = self._meter.spent_usd() if self._meter is not None else 0.0
@@ -328,6 +341,7 @@ class AgentLoop:
             # Without a price the LLM spend is unknown, so the total is too.
             cost_usd=run.cost_usd + embedding_cost if self._spend is not None else None,
             elapsed_s=elapsed,
+            held=[dict(h) for h in run.held],
         )
 
     # --- states ------------------------------------------------------------
@@ -762,6 +776,8 @@ class LoopAgent(AgentLoop):
         config = AgentConfig.from_env()
         retrieval = RetrievalConfig.from_env()
         context = ToolContext.build(retrieval=retrieval)
+        #: The tools this agent runs against, for a service built around it.
+        self.tool_context = context
         reader = MCPServer(granted_scopes=READ_SCOPES, context=context, var_dir=context.var_dir)
         writer = MCPServer(granted_scopes=WRITE_SCOPES, context=context, var_dir=context.var_dir)
         cap = float(os.environ.get("EVAL_SPEND_CAP_USD") or DEFAULT_SPEND_CAP_USD)
