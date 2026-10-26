@@ -209,9 +209,9 @@ Memory on and off works the same way, with `MEMORY_ENABLED=true` and `false`.
   0010), in batches of 25. Each ticket's facts and label come from a
   hand-written spec; only the wording is written by a model (gpt-4o, not the
   agent's model) and checked against the spec. A batch enters an eval run only
-  after its labels have been reviewed (`"reviewed": true`). Batch 1 is
-  **unreviewed**. The target is 128 synthetic tickets, 150 with the held-out
-  set.
+  after its labels have been reviewed (`"reviewed": true`). Batch 1 (25
+  tickets) is reviewed; one label was changed in review (S-0123). The target is
+  128 synthetic tickets, 150 with the held-out set.
 
 `evals.run --set` chooses the tickets: `held-out` (the default), `synthetic`
 (reviewed batches only) or `full`.
@@ -285,7 +285,7 @@ history, so the ablation cannot move there (ADR 0008). Tickets that make it
 measurable are a Session 8 target.
 
 In progress: the synthetic expansion. The generator is built and batch 1 is
-waiting for label review.
+reviewed; batches 2-6 are next.
 
 Not built yet:
 

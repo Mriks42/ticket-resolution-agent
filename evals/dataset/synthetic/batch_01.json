@@ -1,6 +1,6 @@
 {
   "batch": 1,
-  "reviewed": false,
+  "reviewed": true,
   "today": "2026-08-24",
   "writer": {
     "model": "gpt-4o",
@@ -785,5 +785,6 @@
         "chargeback"
       ]
     }
-  ]
+  ],
+  "reviewed_by": "label owner, ticket by ticket in chat, 2026-10-26"
 }
