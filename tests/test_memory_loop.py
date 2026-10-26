@@ -17,6 +17,7 @@ import pytest
 from evals.loader import load_tickets
 from evals.schema import Ticket
 from src.agent.config import AgentConfig
+from src.agent.guardrail import account_grounding
 from src.agent.llm import LLMError
 from src.tools.catalog import CATALOG
 from tests.agent_fakes import ScriptedLLM, completion
@@ -134,6 +135,7 @@ async def test_a_closed_ticket_is_remembered(make, tickets, ctx, trace) -> None:
     assert episode.resolution == "Resolved by the agent; a reply was sent."
     [written] = [e for e in trace.records(result.run_id) if e["event"] == "memory_written"]
     assert written["episode"]["ticket_id"] == t.ticket_id
+    assert written["facts"] == ctx.memory.facts.get(t.customer_id)
     assert written["namespace"] == ctx.memory.namespace
 
 
@@ -160,10 +162,36 @@ async def test_a_repeat_customer_sees_the_earlier_ticket(make, tickets) -> None:
     await loop.run(first)
     await loop.run(second)
 
-    past = json.loads(llm.last_observation(2))["past_tickets"]
-    assert [(p["ticket_id"], p["summary"], p["resolution"]) for p in past] == [
+    account = json.loads(llm.last_observation(2))
+    assert [(p["ticket_id"], p["summary"], p["resolution"]) for p in account["past_tickets"]] == [
         ("T-001", first.body, "Escalated to a human."),
     ]
+    assert account["memory"]["tickets_closed"] == 1
+    assert [e["ticket_id"] for e in account["memory"]["escalations"]] == ["T-001"]
+
+
+@pytest.mark.asyncio
+async def test_memory_off_hides_what_an_earlier_run_remembered(make, tickets) -> None:
+    first = tickets["T-001"]
+    second = first.model_copy(update={"ticket_id": "T-001-B", "body": "Following up on my last message."})
+    await make(ScriptedLLM(escalate(first))).run(first)
+    llm = ScriptedLLM(
+        completion("lookup_customer", {"customer_id": second.customer_id}),
+        escalate(second),
+    )
+    await make(llm, memory=False).run(second)
+
+    account = json.loads(llm.last_observation(1))
+    assert "past_tickets" not in account
+    assert "memory" not in account
+
+
+def test_remembered_facts_are_not_grounding() -> None:
+    """Refund amounts reach a later reply's grounding through the episode
+    text in `past_tickets`, as the customer's history; the facts block adds
+    nothing the guardrail reads."""
+    texts, facts = account_grounding({"memory": {"refunds": [{"amount": 77.0, "status": "issued"}]}})
+    assert (texts, facts) == ([], set())
 
 
 @pytest.mark.asyncio

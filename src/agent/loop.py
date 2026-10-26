@@ -26,9 +26,10 @@ decided by the gate's deterministic rules and then carried out by the loop:
 
 **Memory is switchable** (`AgentConfig.memory`, ADR 0008). Off, the
 customer's history never enters the run: the past-ticket search is not
-offered, and `past_tickets` is removed from the account record before the
-model or the guardrail sees it. On, a history search always runs for the
-ticket's own customer, whatever the model asked for.
+offered, `past_tickets` and `memory` are removed from the account record
+before the model or the guardrail sees it, and nothing is written at close.
+On, a history search always runs for the ticket's own customer, whatever the
+model asked for, and the run is remembered at close.
 
 `escalate` itself always goes through, and wins over anything held: the gate
 never overrides a hand-off. Every run that ends in ESCALATE or FAILED files
@@ -102,10 +103,10 @@ READ_SCOPES = frozenset(spec.scope for spec in CATALOG.values() if not spec.gate
 #: Granted to the server only the gate dispatches to. The model never reaches it.
 WRITE_SCOPES = frozenset(spec.scope for spec in CATALOG.values() if spec.gated)
 GATED = frozenset(name for name, spec in CATALOG.items() if spec.gated)
-#: What memory off removes: the tool that reads history, and the history
-#: field of the account record.
+#: What memory off removes: the tool that reads history, and the account
+#: record's history and remembered facts.
 MEMORY_TOOLS = frozenset({"search_past_tickets"})
-MEMORY_FIELDS = ("past_tickets",)
+MEMORY_FIELDS = ("past_tickets", "memory")
 
 OUTCOME = {
     State.RESOLVE: Outcome.RESOLVE,

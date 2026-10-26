@@ -136,6 +136,19 @@ def test_lookup_customer_carries_the_history_memory_holds(ctx: ToolContext) -> N
     assert list(record)[-1] == "past_tickets", "same shape the model saw before memory existed"
 
 
+def test_lookup_customer_shows_remembered_facts_once_there_are_some(ctx: ToolContext) -> None:
+    """Absent until the customer has a close, so the account record is
+    exactly what it was before memory existed for everyone else."""
+    assert "memory" not in call(ctx, "lookup_customer", customer_id="CUST-1042")
+    written = ctx.memory.remember(Close(
+        run_id="run-1", customer_id="CUST-1042", ticket_id="T-001", body="Charged twice.",
+        final_state="ESCALATE", date="2026-10-26", clauses=("BIL-001.2",),
+    ))
+    record = call(ctx, "lookup_customer", customer_id="CUST-1042")
+    assert record["memory"] == written["facts"]
+    assert list(record)[-2:] == ["past_tickets", "memory"]
+
+
 def test_what_one_context_remembers_another_does_not_see(tmp_path) -> None:
     """One context per eval run, so one run's writes never reach the next."""
     a = ToolContext.build(var_dir=tmp_path / "a", retrieval=RetrievalConfig())

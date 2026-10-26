@@ -59,12 +59,16 @@ class ToolSpec:
 
 
 def lookup_customer(ctx: ToolContext, *, customer_id: str) -> dict:
-    """The account, then its history from memory, oldest first."""
+    """The account, then its history from memory, oldest first, then the
+    facts remembered about it — absent until it has a close (ADR 0008)."""
     record = ctx.fixtures.customer(customer_id)
     record["past_tickets"] = [
         {"ticket_id": e.ticket_id, "opened": e.opened, "summary": e.summary, "resolution": e.resolution}
         for e in ctx.memory.episodes.history(customer_id)
     ]
+    facts = ctx.memory.facts.get(customer_id)
+    if facts:
+        record["memory"] = facts
     return record
 
 

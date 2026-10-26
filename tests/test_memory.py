@@ -1,19 +1,24 @@
-"""Episodic memory, against both backends.
+"""The memory layer's two stores, against both backends.
 
-One contract, two implementations (ADR 0008): in-process over the TF-IDF
-index for the lexical configuration, pgvector for dense and hybrid. Each
-contract test runs against both; the pgvector ones use a throwaway schema and
-are skipped without `docker compose up -d`. Their embedder is the hashing one,
-so they pin the plumbing — scoping, ordering, namespaces, the cache — not how
-well a real model ranks.
+One contract per layer, two implementations each (ADR 0008): in-process for
+the lexical configuration, Postgres for dense and hybrid. Each contract test
+runs against both; the Postgres ones use a throwaway schema and are skipped
+without `docker compose up -d`. The episodic embedder is the hashing one, so
+those tests pin the plumbing — scoping, ordering, namespaces, the cache — not
+how well a real model ranks. `fold`, which turns a close into durable facts,
+is pure and tested on its own.
 """
 
 from __future__ import annotations
 
 import pytest
 
+from dataclasses import replace
+
+from src.memory import Memory
 from src.memory.close import Close, Refund
 from src.memory.episodic import Episode, InProcessEpisodes, PgEpisodes, resolution_text
+from src.memory.semantic import InProcessFacts, PgFacts, fold
 
 SEED = [
     Episode("CUST-A", "H-1", "2026-06-01", "Charged twice for June.", "Refunded the duplicate."),
@@ -140,3 +145,92 @@ def test_refunds_are_recorded_with_their_status() -> None:
 def test_an_unknown_terminal_state_is_refused() -> None:
     with pytest.raises(ValueError, match="PLAN"):
         resolution_text(close("PLAN"))
+
+
+# --- semantic memory: folding a close into the customer's facts --------------------
+
+
+def test_the_first_close_starts_the_record() -> None:
+    facts = fold({}, close("ESCALATE", clauses=("BIL-001.2", "ESC-001.6")))
+    assert facts == {
+        "tickets_closed": 1,
+        "refunds": [],
+        "escalations": [{"ticket_id": "T-9", "date": "2026-10-26", "clauses": ["BIL-001.2", "ESC-001.6"]}],
+        "policies_cited": {"POL-BIL-001": 1, "POL-ESC-001": 1},
+        "recurring": [],
+    }
+
+
+def test_refunds_keep_their_status_and_a_pending_ticket_is_not_an_escalation() -> None:
+    facts = fold({}, close(
+        "PENDING_APPROVAL", refunds=(Refund(29.0, "issued"), Refund(290.0, "held")),
+    ))
+    assert facts["refunds"] == [
+        {"ticket_id": "T-9", "amount": 29.0, "status": "issued", "date": "2026-10-26"},
+        {"ticket_id": "T-9", "amount": 290.0, "status": "held", "date": "2026-10-26"},
+    ]
+    assert facts["escalations"] == []
+
+
+def test_a_failed_run_counts_as_an_escalation() -> None:
+    assert len(fold({}, close("FAILED"))["escalations"]) == 1
+
+
+def test_a_policy_cited_at_two_closes_is_recurring_but_escalation_procedure_is_not() -> None:
+    """Counted once per ticket however many of its clauses are cited."""
+    first = fold({}, close("ESCALATE", clauses=("SLA-001.3", "SLA-001.5", "ESC-001.6")))
+    second = fold(first, close("ESCALATE", clauses=("SLA-001.5", "ESC-001.6")))
+    assert first["policies_cited"]["POL-SLA-001"] == 1
+    assert second["policies_cited"] == {"POL-ESC-001": 2, "POL-SLA-001": 2}
+    assert second["recurring"] == ["POL-SLA-001"]
+    assert second["tickets_closed"] == 2
+
+
+def test_fold_does_not_change_its_input() -> None:
+    first = fold({}, close("ESCALATE", refunds=(Refund(29.0, "issued"),)))
+    snapshot = {k: (list(v) if isinstance(v, list) else v) for k, v in first.items()}
+    fold(first, close("ESCALATE", refunds=(Refund(10.0, "issued"),)))
+    assert first == snapshot
+
+
+# --- semantic memory: the store contract -------------------------------------------
+
+
+@pytest.fixture(params=["in-process", "postgres"])
+def make_facts(request):
+    if request.param == "in-process":
+        return lambda namespace="ns-1": InProcessFacts(namespace=namespace)
+    pg = request.getfixturevalue("pg")
+    return lambda namespace="ns-1": PgFacts(conn=pg, namespace=namespace)
+
+
+def test_a_customer_with_no_closes_has_no_facts(make_facts) -> None:
+    assert make_facts().get("CUST-A") == {}
+
+
+def test_facts_come_back_as_written_key_order_included(make_facts) -> None:
+    """Key order reaches the model in the account record, so it must not
+    depend on the backend."""
+    store = make_facts()
+    facts = fold({}, close("PENDING_APPROVAL", refunds=(Refund(290.0, "held"),), clauses=("ESC-001.2",)))
+    store.put("CUST-A", facts)
+    back = store.get("CUST-A")
+    assert back == facts
+    assert list(back) == list(facts)
+    assert list(back["refunds"][0]) == list(facts["refunds"][0])
+
+
+def test_facts_namespaces_do_not_see_each_others_writes(make_facts) -> None:
+    a, b = make_facts("ns-a"), make_facts("ns-b")
+    a.put("CUST-A", fold({}, close("ESCALATE")))
+    assert b.get("CUST-A") == {}
+
+
+def test_remember_writes_both_layers() -> None:
+    memory = Memory(InProcessEpisodes(SEED, namespace="ns-1"), InProcessFacts(namespace="ns-1"))
+    first = memory.remember(close("ESCALATE", clauses=("SLA-001.5",)))
+    second = memory.remember(replace(close("ESCALATE", clauses=("SLA-001.5",)), ticket_id="T-10"))
+    assert first["facts"]["tickets_closed"] == 1
+    assert second["facts"]["recurring"] == ["POL-SLA-001"]
+    assert memory.facts.get("CUST-A") == second["facts"]
+    assert [e.ticket_id for e in memory.episodes.history("CUST-A")][-2:] == ["T-9", "T-10"]
