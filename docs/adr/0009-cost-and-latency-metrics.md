@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted. Built with this ADR; the first numbers come from the next eval
-runs, not from earlier reports, which do not carry per-ticket cost or time.
+Accepted. First measured 2026-10-26 (*Measured*). Reports from before this
+ADR carry no per-ticket cost or time and show `n/a`.
 
 ## Context
 
@@ -67,6 +67,35 @@ each resample.
 **Not reported is not zero.** An agent whose results carry no cost or no
 time — the stubs, and any report from before this ADR — gets `n/a` with the
 reason in the caveat, never a number.
+
+## Measured
+
+Two runs at the default configuration (gpt-4o-mini, dense retrieval,
+guardrail blocking, memory on), on the 22 held-out tickets:
+
+```sh
+uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/cost_latency_run1.json
+uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/cost_latency_run2.json
+uv run python -m evals.compare_runs --trace var/trace/trace.jsonl \
+    run=evals/report/cost_latency_run1.json run=evals/report/cost_latency_run2.json
+```
+
+| | run 1 | run 2 |
+|---|---|---|
+| cost per resolved ticket, USD [95% CI] | 0.00235 [0.00136, 0.00590] | 0.00254 [0.00144, 0.00648] |
+| p50 latency per resolved ticket, s [95% CI] | 3.76 [3.28, 7.78] | 3.51 [3.17, 4.68] |
+| p95 latency per resolved ticket, s [95% CI] | 10.63 [3.76, 12.08] | 4.77 [3.51, 4.81] |
+| correctly resolved tickets | 7 | 7 |
+
+- **Embeddings are a rounding error in cost.** Over the 44 tickets they came
+  to $0.000016, against $0.0343 of LLM spend, about 0.05%, because most
+  query text was already in the cache. A cold cache would cost more, but the
+  same order of magnitude.
+- **p95 moved from 10.6 s to 4.8 s between identical runs.** With seven
+  resolved tickets it is the slowest one or two, so one slow model response
+  sets it, as predicted above. Read p50.
+- Both cost intervals span more than a factor of four. That is seven
+  resolutions in the denominator, not noise in the price.
 
 ## What it costs
 

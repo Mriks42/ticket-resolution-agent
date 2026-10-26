@@ -77,8 +77,8 @@ def format_report(
         ),
         *_final_states_line(tickets, results),
         "",
-        f"{'metric':<24}{'value':>8}  {'95% CI':<18}{'n':>12}",
-        "-" * 64,
+        f"{'metric':<24}{'value':>8}  {'95% CI':<22}{'n':>12}",
+        "-" * 68,
     ]
     for m in metrics:
         ci = (
@@ -87,7 +87,7 @@ def format_report(
             else f"[{format_value(m.name, m.ci_low)}, {format_value(m.name, m.ci_high)}]"
         )
         n = f"{m.numerator:g}/{m.denominator:g}"
-        lines.append(f"{m.name:<24}{format_value(m.name, m.value):>8}  {ci:<18}{n:>12}")
+        lines.append(f"{m.name:<24}{format_value(m.name, m.value):>8}  {ci:<22}{n:>12}")
 
     lines += ["", "how to read these"]
     for m in metrics:
