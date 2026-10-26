@@ -111,6 +111,18 @@ never from anything the model said. Writes are never retried, and a refund
 that times out escalates as an unknown outcome. Every escalated or failed run
 files exactly one escalation, so no stopped ticket is lost.
 
+**Memory** ([ADR 0008](docs/adr/0008-memory-layer.md)) has two layers, kept
+separate. Episodic memory holds a customer's past tickets: it backs
+`search_past_tickets` (pgvector under the dense configuration, with no
+similarity floor) and the history in `lookup_customer`. Semantic memory holds
+facts folded in at each close: refunds issued or held, escalations, and
+policies cited more than once. Every run writes at its terminal state, with
+the customer's words and a fixed-template outcome. The model's own prose is
+never stored, because the guardrail treats history as the customer's records.
+Each eval run starts from fresh memory seeded with the fixtures' history.
+`MEMORY_ENABLED=false` is the stateless baseline: no history search, no
+history or facts in the account record, nothing written.
+
 ## Quickstart
 
 Requirements: Python 3.11, [uv](https://docs.astral.sh/uv/), and Docker for
@@ -155,6 +167,8 @@ GUARDRAIL_MODE=block  uv run python -m evals.run --agent src.agent.loop:LoopAgen
 GUARDRAIL_MODE=detect uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/detect1.json
 ```
 
+Memory on and off works the same way, with `MEMORY_ENABLED=true` and `false`.
+
 ## Evaluation
 
 **Dataset** (`evals/dataset/`):
@@ -168,8 +182,8 @@ GUARDRAIL_MODE=detect uv run python -m evals.run --agent src.agent.loop:LoopAgen
   `POLICY_NOTES.md` documents one deliberate contradiction and several
   deliberate gaps, which test whether the agent notices rather than improvises.
   The notes are kept out of the retrieval corpus.
-- `customers.json`: account records and history behind `lookup_customer` and
-  `search_past_tickets`.
+- `customers.json`: account records behind `lookup_customer`, and the prior
+  history that episodic memory is seeded with.
 - `retrieval_probes.json`: 16 queries no clause answers, for the similarity
   floor. **Unreviewed.**
 - `guardrail_cases.json`: 42 reply drafts with planted errors, for the
@@ -223,7 +237,7 @@ src/
   agent/      loop, state machine, budgets, gate, guardrail, LLM adapter, prompts
   tools/      tool implementations, retrieval backends, embeddings
   mcp/        MCP server, permission scopes, audit log
-  memory/     (not built yet)
+  memory/     episodic and semantic stores, written at close
   api/        (not built yet)
 evals/
   dataset/    tickets, policy corpus, customers, probes, guardrail cases
@@ -241,9 +255,13 @@ Built and measured: the retrieval backends, the agent loop, the HITL gate, the
 retrieval guardrail, and the eval harness with bootstrap CIs. Each ADR records
 what was measured, including the results that did not go the expected way.
 
+Built, but not yet measurable: the memory layer and its on/off switch. On the
+held-out set no customer writes in twice and no labelled outcome depends on
+history, so the ablation cannot move there (ADR 0008). Tickets that make it
+measurable are a Session 8 target.
+
 Not built yet:
 
-- the memory layer (episodic and semantic) and its on/off ablation
 - the cost-per-resolved-ticket and latency metrics
 - the step-budget sweep (4 / 8 / 16)
 - the synthetic dataset expansion

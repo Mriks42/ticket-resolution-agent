@@ -1,9 +1,9 @@
-# Local Postgres + pgvector for retrieval (and, later, the memory layer).
+# Local Postgres + pgvector for retrieval and the memory layer.
 #
 #     docker compose up -d
 #
-# The schema is not mounted here: `src/tools/vectorstore.py` applies it
-# idempotently on connect, so the code and the tables cannot drift apart.
+# The schema is not mounted here: `src/tools/dense.py` and `src/memory/` apply
+# it idempotently on connect, so the code and the tables cannot drift apart.
 #
 # Credentials are local-only and match DATABASE_URL in .env.example. The image
 # is pinned to an exact pgvector release because rankings are part of the eval
