@@ -11,7 +11,9 @@ one audit log and one in-process memory the loop writes to at close.
 `pg` gives a test its own Postgres schema, dropped afterwards, so tests never
 read or write the tables a dev run or an eval run uses. Tests that need it are
 skipped, with the reason shown, when Postgres is not reachable — they need
-`docker compose up -d`, not a code change.
+`docker compose up -d`, not a code change. With `TRA_REQUIRE_PG=1`, as CI sets
+it, an unreachable Postgres fails them instead: a green run there must mean the
+pgvector tests ran.
 """
 
 from __future__ import annotations
@@ -38,6 +40,12 @@ from src.tools.context import ToolContext
 from src.tools.retrieval import RetrievalConfig
 
 
+def _unavailable(reason: str) -> None:
+    if os.environ.get("TRA_REQUIRE_PG") == "1":
+        pytest.fail(f"{reason}, and TRA_REQUIRE_PG=1 forbids skipping")
+    pytest.skip(f"{reason}; run `docker compose up -d`")
+
+
 @pytest.fixture
 def pg():
     psycopg = pytest.importorskip("psycopg")
@@ -45,11 +53,11 @@ def pg():
     # developer's RETRIEVAL_BACKEND into every test that runs after this one.
     url = os.environ.get("DATABASE_URL") or read_dotenv().get("DATABASE_URL")
     if not url:
-        pytest.skip("DATABASE_URL not set; run `docker compose up -d`")
+        _unavailable("DATABASE_URL not set")
     try:
         conn = psycopg.connect(url, autocommit=True, connect_timeout=2)
     except psycopg.OperationalError as exc:
-        pytest.skip(f"Postgres not reachable ({exc.__class__.__name__}); run `docker compose up -d`")
+        _unavailable(f"Postgres not reachable ({exc.__class__.__name__})")
 
     schema = f"test_{uuid.uuid4().hex[:12]}"
     # The extension must exist before search_path moves, or the first test on

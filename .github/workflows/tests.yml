@@ -1,0 +1,44 @@
+# The full test suite on every push and pull request.
+#
+# No secrets: the suite makes no network calls (the live model test is opt-in
+# with TRA_LIVE=1, never set here). Postgres + pgvector runs as a service
+# container on the same image docker-compose.yml pins, so the pgvector tests
+# run rather than skip, and TRA_REQUIRE_PG=1 makes a missing database a
+# failure instead of a quiet skip.
+
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.0-pg17
+        env:
+          POSTGRES_USER: tra
+          POSTGRES_PASSWORD: tra
+          POSTGRES_DB: ticket_agent
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tra -d ticket_agent"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 15
+    env:
+      DATABASE_URL: postgresql://tra:tra@localhost:5432/ticket_agent
+      TRA_REQUIRE_PG: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install (Python from .python-version, versions from uv.lock)
+        run: uv sync --locked
+      - name: Test
+        run: uv run pytest -q
