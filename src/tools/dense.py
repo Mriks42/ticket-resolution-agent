@@ -100,6 +100,36 @@ def _vector_literal(vector: Sequence[float]) -> str:
     return "[" + ",".join(repr(float(x)) for x in vector) + "]"
 
 
+def embed_missing(conn: psycopg.Connection, embedder: Embedder, texts: Sequence[str]) -> int:
+    """Embed and store whichever of `texts` have no vector under
+    `embedder.model` yet, and return how many that was. Rows are keyed by the
+    text's hash; the text itself is not stored. Shared by every table that
+    joins to `embedding`, so a text is embedded once whoever asks first."""
+    by_hash = {text_sha256(t): t for t in texts}
+    have = {
+        row[0]
+        for row in conn.execute(
+            "SELECT text_sha256 FROM embedding WHERE model = %s AND text_sha256 = ANY(%s)",
+            (embedder.model, list(by_hash)),
+        )
+    }
+    todo = sorted(h for h in by_hash if h not in have)
+    if not todo:
+        return 0
+    vectors = embedder.embed([by_hash[h] for h in todo])
+    with conn.cursor() as cur:
+        cur.executemany(
+            "INSERT INTO embedding (model, text_sha256, dims, embedding) "
+            "VALUES (%s, %s, %s, %s::vector) "
+            "ON CONFLICT (model, text_sha256) DO NOTHING",
+            [
+                (embedder.model, h, embedder.dims, _vector_literal(v))
+                for h, v in zip(todo, vectors, strict=True)
+            ],
+        )
+    return len(todo)
+
+
 class DensePolicyIndex:
     """Cosine-similarity search over clause embeddings stored in Postgres."""
 
@@ -158,19 +188,9 @@ class DensePolicyIndex:
     def _sync(self, clauses: list[Clause]) -> None:
         """Make `policy_clause` match `clauses` for this model, embedding only
         text that has never been embedded under it."""
-        text_by_hash = {text_sha256(indexed_text(c)): indexed_text(c) for c in clauses}
-        have = {
-            row[0]
-            for row in self._conn.execute(
-                "SELECT text_sha256 FROM embedding "
-                "WHERE model = %s AND text_sha256 = ANY(%s)",
-                (self.model, list(text_by_hash)),
-            )
-        }
-        todo = sorted(h for h in text_by_hash if h not in have)
-        if todo:
-            self._store(todo, self._embedder.embed([text_by_hash[h] for h in todo]))
-            self.stats.clauses_embedded += len(todo)
+        self.stats.clauses_embedded += embed_missing(
+            self._conn, self._embedder, [indexed_text(c) for c in clauses]
+        )
 
         with self._conn.transaction():
             self._conn.execute(
@@ -190,26 +210,8 @@ class DensePolicyIndex:
                 )
 
     def _ensure_query_embedded(self, query: str) -> str:
-        query_hash = text_sha256(query)
-        cached = self._conn.execute(
-            "SELECT 1 FROM embedding WHERE model = %s AND text_sha256 = %s",
-            (self.model, query_hash),
-        ).fetchone()
-        if cached:
-            self.stats.query_cache_hits += 1
-        else:
-            self._store([query_hash], self._embedder.embed([query]))
+        if embed_missing(self._conn, self._embedder, [query]):
             self.stats.query_embeds += 1
-        return query_hash
-
-    def _store(self, hashes: list[str], vectors: list[list[float]]) -> None:
-        with self._conn.cursor() as cur:
-            cur.executemany(
-                "INSERT INTO embedding (model, text_sha256, dims, embedding) "
-                "VALUES (%s, %s, %s, %s::vector) "
-                "ON CONFLICT (model, text_sha256) DO NOTHING",
-                [
-                    (self.model, h, self._embedder.dims, _vector_literal(v))
-                    for h, v in zip(hashes, vectors, strict=True)
-                ],
-            )
+        else:
+            self.stats.query_cache_hits += 1
+        return text_sha256(query)
