@@ -24,6 +24,12 @@ decided by the gate's deterministic rules and then carried out by the loop:
             ticket ends in PENDING_APPROVAL.
 - ESCALATE  the action does not run; the ticket ends in ESCALATE.
 
+**Memory is switchable** (`AgentConfig.memory`, ADR 0008). Off, the
+customer's history never enters the run: the past-ticket search is not
+offered, and `past_tickets` is removed from the account record before the
+model or the guardrail sees it. On, a history search always runs for the
+ticket's own customer, whatever the model asked for.
+
 `escalate` itself always goes through, and wins over anything held: the gate
 never overrides a hand-off. Every run that ends in ESCALATE or FAILED files
 exactly one escalation, by the model or by the system, so no stopped ticket is
@@ -58,7 +64,7 @@ import re
 import time
 import uuid
 from collections.abc import Callable, Iterable
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass, field, replace
 
 from evals.schema import AgentResult, Outcome, Ticket, Tool, ToolCall
 from src.agent.config import AgentConfig
@@ -93,6 +99,10 @@ READ_SCOPES = frozenset(spec.scope for spec in CATALOG.values() if not spec.gate
 #: Granted to the server only the gate dispatches to. The model never reaches it.
 WRITE_SCOPES = frozenset(spec.scope for spec in CATALOG.values() if spec.gated)
 GATED = frozenset(name for name, spec in CATALOG.items() if spec.gated)
+#: What memory off removes: the tool that reads history, and the history
+#: field of the account record.
+MEMORY_TOOLS = frozenset({"search_past_tickets"})
+MEMORY_FIELDS = ("past_tickets",)
 
 OUTCOME = {
     State.RESOLVE: Outcome.RESOLVE,
@@ -116,9 +126,14 @@ EMPTY_RETRIEVAL_NOTE = (
 _CLAUSE_ID = re.compile(r"\b([A-Z]{3}-\d{3})\.\d+\b")
 
 
-def tool_schemas() -> list[FunctionSchema]:
-    """Every catalog tool, as the model sees it. The catalog is the one source."""
-    return [FunctionSchema(s.name, s.description, s.input_schema) for s in CATALOG.values()]
+def tool_schemas(*, memory: bool = True) -> list[FunctionSchema]:
+    """The catalog tools, as the model sees them. The catalog is the one
+    source; with memory off the history search is left out."""
+    return [
+        FunctionSchema(s.name, s.description, s.input_schema)
+        for s in CATALOG.values()
+        if memory or s.name not in MEMORY_TOOLS
+    ]
 
 
 def render_ticket(ticket: Ticket) -> str:
@@ -211,7 +226,9 @@ class AgentLoop:
         self._clock = clock
         self._spend = spend
         self._context = context or {}
-        self._schemas = tool_schemas()
+        self._memory = config.memory
+        self._schemas = tool_schemas(memory=self._memory)
+        self._offered = [s.name for s in self._schemas]
 
     async def run(self, ticket: Ticket) -> AgentResult:
         run = _Run(run_id=f"run-{uuid.uuid4().hex[:12]}", ticket=ticket, started=self._clock())
@@ -229,6 +246,7 @@ class AgentLoop:
             prompt_sha256=self._prompt.sha256,
             budgets=self._config.budgets(),
             guardrail_mode=self._config.guardrail_mode,
+            memory=self._config.memory,
             context=self._context,
         )
 
@@ -313,10 +331,10 @@ class AgentLoop:
 
         if call is None:
             return self._invalid(run, None, "no_tool_call", "Every turn must call exactly one tool.")
-        if call.name not in CATALOG:
+        if call.name not in self._offered:
             return self._invalid(
                 run, call, "unknown_tool",
-                f"There is no tool named {call.name!r}. Use one of: {', '.join(CATALOG)}.",
+                f"There is no tool named {call.name!r}. Use one of: {', '.join(self._offered)}.",
             )
         try:
             args = json.loads(call.arguments)
@@ -378,6 +396,10 @@ class AgentLoop:
                 run, State.ESCALATE,
                 f"wall-clock budget exhausted ({cfg.max_seconds:g}s) during {call.name}",
             )
+        if call.name == "lookup_customer" and obs.status == "ok" and not self._memory:
+            obs = replace(obs, payload={
+                k: v for k, v in obs.payload.items() if k not in MEMORY_FIELDS
+            })
         content = obs.for_model()
         if obs.status == "ok":
             self._absorb(run, call.name, obs.payload)

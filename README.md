@@ -213,7 +213,8 @@ Set in `.env` (see `.env.example`); the environment overrides the file.
 | `AGENT_MAX_TOKENS` | `50000` | input + output tokens per ticket |
 | `AGENT_MAX_WALL_CLOCK_SECONDS` | `120` | per ticket |
 | `TRA_VAR_DIR` | `var/` | where traces, audit logs and the write store go |
-| `MEMORY_ENABLED`, `LOG_LEVEL` | — | reserved; not read by any code yet |
+| `MEMORY_ENABLED` | `true` | `false` keeps all customer history from the agent: the stateless baseline (ADR 0008) |
+| `LOG_LEVEL` | — | reserved; not read by any code yet |
 
 ## Layout
 

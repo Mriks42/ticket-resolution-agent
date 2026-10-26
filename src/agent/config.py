@@ -18,6 +18,16 @@ from dataclasses import asdict, dataclass
 from src.agent.openai_chat import DEFAULT_CHAT_MODEL, DEFAULT_SEED
 
 
+def boolean(raw: str) -> bool:
+    """`true`/`false` or `1`/`0`, any case. Anything else is a typo, not off."""
+    value = raw.lower()
+    if value in ("true", "1"):
+        return True
+    if value in ("false", "0"):
+        return False
+    raise ValueError(raw)
+
+
 @dataclass(frozen=True)
 class AgentConfig:
     model: str = DEFAULT_CHAT_MODEL
@@ -46,9 +56,17 @@ class AgentConfig:
     #: report a hallucinated-policy rate.
     guardrail_mode: str = "block"
 
+    #: On, the customer's history reaches the agent — the past-ticket search
+    #: and `past_tickets` in the account record. Off, neither does, which is
+    #: the stateless baseline of the memory ablation (ADR 0008). The account
+    #: itself (plan, seats, charges) is current state, not memory, and stays.
+    memory: bool = True
+
     def __post_init__(self) -> None:
         if self.guardrail_mode not in ("block", "detect"):
             raise ValueError(f"guardrail_mode must be 'block' or 'detect', got {self.guardrail_mode!r}")
+        if not isinstance(self.memory, bool):
+            raise ValueError(f"memory must be a bool, got {self.memory!r}")
         for name in ("max_steps", "max_tokens", "max_invalid_calls", "max_repeats"):
             if getattr(self, name) < 1:
                 raise ValueError(f"{name} must be at least 1, got {getattr(self, name)}")
@@ -79,6 +97,7 @@ class AgentConfig:
             max_seconds=get("AGENT_MAX_WALL_CLOCK_SECONDS", float, defaults.max_seconds),
             tool_timeout=get("AGENT_TOOL_TIMEOUT_SECONDS", float, defaults.tool_timeout),
             guardrail_mode=get("GUARDRAIL_MODE", str, defaults.guardrail_mode),
+            memory=get("MEMORY_ENABLED", boolean, defaults.memory),
         )
 
     def budgets(self) -> dict:

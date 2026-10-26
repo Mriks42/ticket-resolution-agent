@@ -5,7 +5,8 @@ machine. Every line carries `timestamp`, `run_id` and `event`; the rest
 depends on the event:
 
     run_started    ticket_id, customer_id, model, temperature, seed,
-                   prompt_version, prompt_sha256, budgets, context
+                   prompt_version, prompt_sha256, budgets, guardrail_mode,
+                   memory, context
     transition     from_state, to_state, reason, step
     llm_call       turn, input_tokens, output_tokens, latency_ms,
                    served_model, finish_reason, tool_calls, cost_usd
