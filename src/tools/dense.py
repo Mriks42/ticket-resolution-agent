@@ -183,6 +183,10 @@ class DensePolicyIndex:
     def __len__(self) -> int:
         return len(self._clauses)
 
+    @property
+    def embedder(self) -> Embedder:
+        return self._embedder
+
     # --- storage -----------------------------------------------------------
 
     def _sync(self, clauses: list[Clause]) -> None:

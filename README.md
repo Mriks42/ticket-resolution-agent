@@ -148,7 +148,7 @@ TRA_LIVE=1 uv run pytest tests/test_live.py -s    # one ticket, about $0.001
 | command | what it measures | cost |
 |---|---|---|
 | `uv run python -m evals.run` | the always-escalate stub: the floor any agent must beat | $0 |
-| `uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/run1.json` | the real agent over all tickets, five metrics with bootstrap CIs | a few cents |
+| `uv run python -m evals.run --agent src.agent.loop:LoopAgent --out evals/report/run1.json` | the real agent over all tickets, eight metrics with bootstrap CIs | a few cents |
 | `uv run python -m evals.compare_runs a=<report> b=<report> --trace var/trace/trace.jsonl` | configurations compared as sets of runs, plus gate and guardrail decisions from the trace | $0 |
 | `uv run python -m evals.retrieval_baseline --backend lexical dense hybrid --floor 0.30` | retrieval recall per backend, no agent involved | first run only, under a cent |
 | `uv run python -m evals.retrieval_baseline --backend lexical dense --calibrate-floor` | the dense similarity floor, by a rule fixed in advance | $0 after the first run |
@@ -205,10 +205,11 @@ tickets:
 | tool-call precision | fraction of tool calls that were a right call (name-level) |
 | pending-approval rate | tickets that ended waiting for approval; never folded into the others |
 | hallucinated-policy rate | drafted replies with a guardrail violation, over drafted replies |
+| cost per resolved ticket | all spend on every ticket (LLM and embedding calls), over correctly resolved tickets |
+| p50 / p95 latency per resolved ticket | wall clock from start to terminal state, over correctly resolved tickets |
 
-Not yet reported: **cost per resolved ticket** (the trace records LLM cost per
-run, but embedding cost is not yet included) and **p50/p95 latency per resolved
-ticket** (recorded in the trace, not yet a metric).
+Cost and latency are defined in [ADR 0009](docs/adr/0009-cost-and-latency-metrics.md).
+An agent that does not report them, such as the stub, gets `n/a`, not zero.
 
 ## Configuration
 
@@ -263,7 +264,6 @@ measurable are a Session 8 target.
 
 Not built yet:
 
-- the cost-per-resolved-ticket and latency metrics
 - the step-budget sweep (4 / 8 / 16)
 - the synthetic dataset expansion
 - the FastAPI service, Terraform for AWS, and CI

@@ -196,7 +196,10 @@ def trace(tmp_path) -> TraceLog:
 
 @pytest.fixture
 def make(ctx, server, writer, trace):
-    def build(llm, *, executor=None, write_executor=None, clock=time.monotonic, spend=None, **config):
+    def build(
+        llm, *, executor=None, write_executor=None, clock=time.monotonic, spend=None,
+        embedding_meter=None, **config,
+    ):
         return AgentLoop(
             llm=llm,
             executor=executor or MCPToolExecutor(server, timeout=5),
@@ -206,6 +209,7 @@ def make(ctx, server, writer, trace):
             clock=clock,
             spend=spend,
             memory_store=ctx.memory,
+            embedding_meter=embedding_meter,
         )
 
     return build

@@ -134,6 +134,11 @@ class AgentResult(BaseModel):
     #: Hallucinated-policy events in the drafted reply, "kind: detail", as the
     #: guardrail found them — whether or not it blocked the reply (ADR 0007).
     policy_violations: list[str] = []
+    #: What the run paid, LLM and embeddings, in USD. None when the agent has
+    #: no price on record: unknown, not free (ADR 0009).
+    cost_usd: float | None = None
+    #: Wall clock from the run's start to its terminal state.
+    elapsed_s: float | None = None
 
 
 @runtime_checkable

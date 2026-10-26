@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from evals.loader import POLICY_DIR, TICKETS_PATH, load_tickets
-from evals.metrics import DEFAULT_RESAMPLES, DEFAULT_SEED, MetricResult, evaluate
+from evals.metrics import DEFAULT_RESAMPLES, DEFAULT_SEED, MetricResult, evaluate, format_value
 from evals.schema import Agent, AgentResult, Confidence, Outcome, Ticket
 from src.config import load_dotenv
 
@@ -49,10 +49,6 @@ async def run_agent(agent: Agent, tickets: list[Ticket]) -> dict[str, AgentResul
             )
         results[ticket.ticket_id] = result
     return results
-
-
-def _fmt(value: float | None) -> str:
-    return "  n/a" if value is None else f"{value:.3f}"
 
 
 def format_report(
@@ -88,10 +84,10 @@ def format_report(
         ci = (
             "n/a"
             if m.ci_low is None
-            else f"[{m.ci_low:.3f}, {m.ci_high:.3f}]"
+            else f"[{format_value(m.name, m.ci_low)}, {format_value(m.name, m.ci_high)}]"
         )
         n = f"{m.numerator:g}/{m.denominator:g}"
-        lines.append(f"{m.name:<24}{_fmt(m.value):>8}  {ci:<18}{n:>12}")
+        lines.append(f"{m.name:<24}{format_value(m.name, m.value):>8}  {ci:<18}{n:>12}")
 
     lines += ["", "how to read these"]
     for m in metrics:
@@ -101,10 +97,13 @@ def format_report(
 
     warnings: list[str] = []
     for m in metrics:
-        if m.denominator == 0:
-            warnings.append(
-                f"{m.name} is undefined (denominator 0), not 0.0. Nothing to measure."
+        if m.value is None:
+            why = (
+                "the agent does not report it"
+                if m.caveat.startswith("Not reported")
+                else "nothing to measure"
             )
+            warnings.append(f"{m.name} is undefined, not 0.0: {why}.")
         elif m.is_degenerate:
             warnings.append(
                 f"{m.name} has a zero-width CI: every resample gave the same value. "
@@ -198,6 +197,8 @@ def build_report(
                 ],
                 "final_state": results[t.ticket_id].final_state,
                 "stop_reason": results[t.ticket_id].stop_reason,
+                "cost_usd": results[t.ticket_id].cost_usd,
+                "elapsed_s": results[t.ticket_id].elapsed_s,
                 "run_id": results[t.ticket_id].run_id,
             }
             for t in tickets

@@ -31,6 +31,8 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from evals.metrics import format_value
+
 OUTCOME_LETTER = {"resolve": "R", "escalate": "E", "pending_approval": "P"}
 
 
@@ -56,9 +58,11 @@ def metric_table(configs: dict[str, list[dict]]) -> list[str]:
                 next((m["value"] for m in r["metrics"] if m["name"] == name), None) for r in reports
             ]
             shown = [v for v in values if v is not None]
-            runs = "  ".join("  n/a" if v is None else f"{v:.3f}" for v in values)
-            mean = f"{statistics.fmean(shown):.3f}" if shown else "n/a"
-            spread = f"{min(shown):.3f}-{max(shown):.3f}" if shown else "n/a"
+            runs = "  ".join(f"{format_value(name, v):>5}" for v in values)
+            mean = format_value(name, statistics.fmean(shown)) if shown else "n/a"
+            spread = (
+                f"{format_value(name, min(shown))}-{format_value(name, max(shown))}" if shown else "n/a"
+            )
             lines.append(f"    {label:<10} runs {runs:<28} mean {mean}  range {spread}")
     return lines
 
@@ -108,10 +112,14 @@ def trace_summary(configs: dict[str, list[dict]], trace_path: Path) -> list[str]
         kinds = Counter(f"{e['tool']}:{v['kind']}" for e in flagged for v in e["violations"])
         filed = Counter(e["filed_by"] for e in events if e["event"] == "escalation_filed")
         cost = [e["cost_usd"] for e in events if e["event"] == "run_finished"]
+        embedding = [e["embedding_cost_usd"] for e in events
+                     if e["event"] == "run_finished" and "embedding_cost_usd" in e]
         lines.append(f"  {label}: {len(reports)} runs, {len(run_ids)} tickets"
                      + (f", {missing} not in this trace" if missing else ""))
         if cost:
             lines.append(f"    LLM cost      ${sum(cost):.4f} total, ${sum(cost) / len(reports):.4f} per run")
+        if embedding:
+            lines.append(f"    embeddings    ${sum(embedding):.6f} total over {len(embedding)} tickets")
         if filed:
             lines.append("    escalations   " + ", ".join(f"filed by {k} {v}" for k, v in sorted(filed.items())))
         if checks:

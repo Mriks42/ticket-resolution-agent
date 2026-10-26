@@ -212,6 +212,10 @@ class PgEpisodes:
         conn.execute(SCHEMA)
         self._write(list(seed))
 
+    @property
+    def embedder(self) -> Embedder:
+        return self._embedder
+
     def history(self, customer_id: str) -> list[Episode]:
         try:
             rows = self._conn.execute(_HISTORY, (self.namespace, customer_id)).fetchall()

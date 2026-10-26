@@ -26,7 +26,7 @@ from evals.schema import Outcome, Ticket, TicketLabels
 from src.agent.executor import MCPToolExecutor
 from src.agent.llm import LLMError, ToolResult, Usage
 from src.agent.loop import READ_SCOPES, WRITE_SCOPES
-from src.agent.pricing import Price, SpendCapExceeded, SpendGuard
+from src.agent.pricing import EmbeddingMeter, Price, SpendCapExceeded, SpendGuard
 from src.agent.states import ALLOWED, State
 from src.httpjson import RetryPolicy
 from src.tools.catalog import CATALOG, Scope
@@ -447,6 +447,69 @@ async def test_the_spend_cap_aborts_the_run_loudly(make, ticket) -> None:
 def test_pricing_is_per_million_tokens() -> None:
     price = Price(input_per_mtok=0.15, output_per_mtok=0.60)
     assert price.cost(Usage(1_000_000, 1_000_000)) == pytest.approx(0.75)
+
+
+PRICE = Price(input_per_mtok=0.15, output_per_mtok=0.60)
+#: One scripted turn: 100 input and 20 output tokens.
+TURN_USD = (100 * 0.15 + 20 * 0.60) / 1_000_000
+
+
+@pytest.mark.asyncio
+async def test_the_result_carries_cost_and_wall_clock(make, ticket) -> None:
+    clock = FakeClock()
+    llm = ScriptedLLM(
+        completion("lookup_customer", {"customer_id": ticket.customer_id}),
+        completion("escalate", {"ticket_id": ticket.ticket_id, "reason": "r"}),
+        clock=clock, advance=1.5,
+    )
+    result = await make(llm, clock=clock, spend=SpendGuard(cap_usd=1.0, price=PRICE)).run(ticket)
+    assert result.cost_usd == pytest.approx(2 * TURN_USD)
+    assert result.elapsed_s == pytest.approx(3.0)
+
+
+@pytest.mark.asyncio
+async def test_without_a_price_the_cost_is_unknown_not_zero(make, ticket) -> None:
+    llm = ScriptedLLM(completion("escalate", {"ticket_id": ticket.ticket_id, "reason": "r"}))
+    result = await make(llm).run(ticket)
+    assert result.cost_usd is None
+    assert result.elapsed_s is not None
+
+
+class FakeEmbedder:
+    def __init__(self, model: str = "text-embedding-3-small") -> None:
+        self.model = model
+        self.tokens_used = 0
+
+
+@pytest.mark.asyncio
+async def test_embedding_spend_during_a_run_is_charged_to_it(make, ticket, trace) -> None:
+    """Tokens the provider counted while this ticket ran are this ticket's;
+    tokens spent building an index beforehand are no ticket's."""
+    embedder = FakeEmbedder()
+    embedder.tokens_used = 5_000  # the index build, before any ticket
+    meter = EmbeddingMeter([embedder])
+
+    async def embed_then_escalate():
+        embedder.tokens_used += 1_000_000  # $0.02 at list price
+        return completion("escalate", {"ticket_id": ticket.ticket_id, "reason": "r"})
+
+    guard = SpendGuard(cap_usd=1.0, price=PRICE)
+    result = await make(ScriptedLLM(embed_then_escalate), spend=guard, embedding_meter=meter).run(ticket)
+
+    assert result.cost_usd == pytest.approx(TURN_USD + 0.02)
+    assert guard.spent_usd == pytest.approx(TURN_USD + 0.02)
+    [finished] = [e for e in trace.records(result.run_id) if e["event"] == "run_finished"]
+    assert finished["cost_usd"] == pytest.approx(TURN_USD)
+    assert finished["embedding_cost_usd"] == pytest.approx(0.02)
+
+
+def test_an_embedding_model_without_a_price_is_refused() -> None:
+    with pytest.raises(ValueError, match="text-embedding-unknown"):
+        EmbeddingMeter([FakeEmbedder("text-embedding-unknown")])
+
+
+def test_lexical_tools_have_no_embedders(ctx) -> None:
+    assert ctx.embedders() == []
 
 
 # --- wiring ---------------------------------------------------------------------------

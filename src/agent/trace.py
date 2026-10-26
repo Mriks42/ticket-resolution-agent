@@ -17,7 +17,7 @@ depends on the event:
     escalation_filed  filed_by (model | system), reason, status, message
     memory_written namespace, episode — once per run, at close, memory on only
     run_finished   final_state, outcome, stop_reason, steps, tokens,
-                   cost_usd, elapsed_s
+                   cost_usd (LLM only), embedding_cost_usd, elapsed_s
 
 The MCP audit log (`src/mcp/audit.py`) is a separate file with a separate
 job: it records every tool call the *server* saw. The trace records what the

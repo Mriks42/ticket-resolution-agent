@@ -89,7 +89,7 @@ from src.agent.llm import (
     User,
 )
 from src.agent.openai_chat import OpenAIChatClient
-from src.agent.pricing import SpendGuard
+from src.agent.pricing import EmbeddingMeter, SpendGuard
 from src.agent.prompt import Prompt, load_prompt
 from src.agent.states import TERMINAL, State, check
 from src.agent.trace import TraceLog
@@ -228,6 +228,7 @@ class AgentLoop:
         context: dict | None = None,
         clause_lookup: Callable[[str], Clause | None] | None = None,
         memory_store: Memory | None = None,
+        embedding_meter: EmbeddingMeter | None = None,
     ) -> None:
         self._llm = llm
         self._executor = executor
@@ -243,12 +244,15 @@ class AgentLoop:
         #: Where a closed run is remembered. None writes nothing; reads still
         #: come through the tools, whose context holds the same store.
         self._memory_store = memory_store
+        #: Embedding spend by the tools, charged to the run it happened in.
+        self._meter = embedding_meter
         self._schemas = tool_schemas()
 
     async def run(self, ticket: Ticket) -> AgentResult:
         run = _Run(run_id=f"run-{uuid.uuid4().hex[:12]}", ticket=ticket, started=self._clock())
         run.messages = [System(self._prompt.text), User(render_ticket(ticket))]
         run.context.append(ticket.body)
+        embedded_before = self._meter.spent_usd() if self._meter is not None else 0.0
         self._trace.emit(
             run.run_id,
             "run_started",
@@ -282,6 +286,14 @@ class AgentLoop:
             written = self._memory_store.remember(self._close(run))
             self._trace.emit(run.run_id, "memory_written", **written)
 
+        # Measured after the memory write, which embeds too (ADR 0009).
+        embedding_cost = 0.0
+        if self._meter is not None:
+            embedding_cost = self._meter.spent_usd() - embedded_before
+            if self._spend is not None:
+                self._spend.add(embedding_cost)  # may raise SpendCapExceeded
+        elapsed = round(self._clock() - run.started, 3)
+
         self._trace.emit(
             run.run_id,
             "run_finished",
@@ -291,7 +303,8 @@ class AgentLoop:
             steps=run.steps,
             tokens=run.tokens,
             cost_usd=round(run.cost_usd, 6),
-            elapsed_s=round(self._clock() - run.started, 3),
+            embedding_cost_usd=round(embedding_cost, 8),
+            elapsed_s=elapsed,
         )
         return AgentResult(
             ticket_id=ticket.ticket_id,
@@ -302,6 +315,9 @@ class AgentLoop:
             final_state=run.state.value,
             stop_reason=run.stop_reason,
             policy_violations=[f"{v.kind}: {v.detail}" for v in run.reply_violations],
+            # Without a price the LLM spend is unknown, so the total is too.
+            cost_usd=run.cost_usd + embedding_cost if self._spend is not None else None,
+            elapsed_s=elapsed,
         )
 
     # --- states ------------------------------------------------------------
@@ -735,4 +751,5 @@ class LoopAgent(AgentLoop):
                 "spend_cap_usd": cap,
             },
             memory_store=context.memory,
+            embedding_meter=EmbeddingMeter(context.embedders()),
         )

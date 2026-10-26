@@ -15,7 +15,7 @@ import pytest
 
 from evals.agents.stub import AlwaysEscalateAgent
 from evals.loader import load_customers, load_policy_ids, load_tickets
-from evals.metrics import bootstrap_ci, evaluate
+from evals.metrics import bootstrap_ci, evaluate, format_value
 from evals.run import run_agent
 from evals.schema import AgentResult, Confidence, Outcome, Ticket, Tool, ToolCall
 
@@ -261,3 +261,73 @@ def test_hallucinated_policy_rate_is_undefined_without_replies(tickets: list[Tic
     rate = score(AlwaysEscalateAgent(), tickets)["hallucinated_policy_rate"]
     assert rate.denominator == 0
     assert rate.value is None
+
+
+# --- cost and latency per resolved ticket (ADR 0009) ------------------------------
+
+
+class CostedGoldAgent(GoldAgent):
+    """Gold outcomes, $0.002 per ticket, and N seconds for ticket T-0NN."""
+
+    name = "costed-gold"
+
+    async def run(self, ticket: Ticket) -> AgentResult:
+        result = await super().run(ticket)
+        return result.model_copy(update={"cost_usd": 0.002, "elapsed_s": float(int(ticket.ticket_id[2:]))})
+
+
+class CostedEscalator(AlwaysEscalateAgent):
+    name = "costed-escalator"
+
+    async def run(self, ticket: Ticket) -> AgentResult:
+        result = await super().run(ticket)
+        return result.model_copy(update={"cost_usd": 0.001, "elapsed_s": 1.0})
+
+
+LATENCY = ("latency_p50_resolved_s", "latency_p95_resolved_s")
+
+
+def test_cost_per_resolved_ticket_charges_all_spend_to_correct_resolutions(
+    tickets: list[Ticket],
+) -> None:
+    """Spend on escalated tickets is part of what a resolution costs."""
+    m = score(CostedGoldAgent(), tickets)["cost_per_resolved_usd"]
+    # 22 tickets at $0.002 over the 10 gold-resolve tickets, resolved correctly.
+    assert m.numerator == pytest.approx(0.044)
+    assert m.denominator == 10.0
+    assert m.value == pytest.approx(0.0044)
+    assert m.ci_low <= m.value <= m.ci_high
+
+
+def test_latency_percentiles_are_over_correctly_resolved_tickets(tickets: list[Ticket]) -> None:
+    m = score(CostedGoldAgent(), tickets)
+    # Resolved correctly: T-001..T-008, T-019, T-020, so 1..8, 19 and 20
+    # seconds. Linear interpolation: p50 between 5 and 6, p95 between 19 and 20.
+    assert m["latency_p50_resolved_s"].value == pytest.approx(5.5)
+    assert m["latency_p95_resolved_s"].value == pytest.approx(19.55)
+    for name in LATENCY:
+        assert (m[name].numerator, m[name].denominator) == (10.0, 22.0)
+        assert m[name].ci_low <= m[name].value <= m[name].ci_high
+
+
+def test_nothing_resolved_leaves_cost_and_latency_undefined(tickets: list[Ticket]) -> None:
+    m = score(CostedEscalator(), tickets)
+    assert m["cost_per_resolved_usd"].denominator == 0
+    for name in ("cost_per_resolved_usd", *LATENCY):
+        assert m[name].value is None
+
+
+def test_cost_and_latency_are_not_invented_for_an_agent_that_does_not_report_them(
+    tickets: list[Ticket],
+) -> None:
+    m = score(GoldAgent(), tickets)
+    for name in ("cost_per_resolved_usd", *LATENCY):
+        assert m[name].value is None
+        assert "not reported" in m[name].caveat.lower()
+
+
+def test_values_print_in_their_own_units() -> None:
+    assert format_value("resolution_rate", 0.3478) == "0.348"
+    assert format_value("cost_per_resolved_usd", 0.0044) == "0.00440"
+    assert format_value("latency_p95_resolved_s", 19.55) == "19.55"
+    assert format_value("latency_p95_resolved_s", None) == "n/a"

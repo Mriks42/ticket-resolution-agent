@@ -1,9 +1,14 @@
 """Metric definitions and percentile bootstrap CIs.
 
-Every metric is a ratio of sums. Each ticket contributes a (numerator,
-denominator) pair, and the metric is sum(num) / sum(den). Bootstrap resamples
-whole tickets, which is the right unit here: a ticket is the independent
+Most metrics are a ratio of sums. Each ticket contributes a (numerator,
+denominator) pair, and the metric is sum(num) / sum(den). The latency metrics
+are percentiles instead: each ticket contributes a value or nothing, and the
+metric is a percentile of the values. Either way the bootstrap resamples whole
+tickets, which is the right unit here: a ticket is the independent
 observation, not a tool call.
+
+Cost and latency need the agent to report them (`AgentResult.cost_usd`,
+`elapsed_s`). An agent that does not gets `n/a`, never a number (ADR 0009).
 """
 
 from __future__ import annotations
@@ -17,6 +22,8 @@ from evals.schema import AgentResult, Outcome, Ticket, Tool
 
 Contribution = tuple[float, float]
 MetricFn = Callable[[Ticket, AgentResult], Contribution]
+#: A ticket's value for a percentile metric, or None if it is not in the sample.
+SampleFn = Callable[[Ticket, AgentResult], float | None]
 
 DEFAULT_RESAMPLES = 10_000
 DEFAULT_SEED = 20260824
@@ -85,6 +92,19 @@ def _pending_approval_rate(ticket: Ticket, result: AgentResult) -> Contribution:
     return (1.0 if result.outcome is Outcome.PENDING_APPROVAL else 0.0, 1.0)
 
 
+def _correctly_resolved(ticket: Ticket, result: AgentResult) -> bool:
+    return result.outcome is Outcome.RESOLVE and ticket.labels.outcome is Outcome.RESOLVE
+
+
+def _cost_per_resolved(ticket: Ticket, result: AgentResult) -> Contribution:
+    """Every ticket's spend over correct resolutions (ADR 0009)."""
+    return (result.cost_usd, 1.0 if _correctly_resolved(ticket, result) else 0.0)
+
+
+def _resolved_latency(ticket: Ticket, result: AgentResult) -> float | None:
+    return result.elapsed_s if _correctly_resolved(ticket, result) else None
+
+
 def _hallucinated_policy_rate(ticket: Ticket, result: AgentResult) -> Contribution:
     drafted = any(call.tool is Tool.SEND_REPLY for call in result.tool_calls)
     if not drafted:
@@ -126,6 +146,35 @@ METRICS: dict[str, tuple[MetricFn, str]] = {
         "a wrong claim with no number in it is invisible here, so read this "
         "beside the guardrail's recall from evals.guardrail_eval.",
     ),
+    "cost_per_resolved_usd": (
+        _cost_per_resolved,
+        "Total spend on every ticket, divided by tickets correctly resolved, "
+        "so spend on escalations and wrong resolutions is charged to the "
+        "resolutions. LLM tokens at list price (cached input not discounted, "
+        "so slightly high) plus embedding calls actually made; text already "
+        "in the embedding cache costs nothing, so a rerun can cost a little "
+        "less than a cold run. Undefined when nothing is resolved.",
+    ),
+}
+
+_LATENCY_CAVEAT = (
+    "Wall clock per correctly resolved ticket, start to terminal state: model, "
+    "tool and embedding calls together. With about ten resolved tickets, p95 "
+    "is close to the slowest of them and its interval is wide. Provider load "
+    "moves it from day to day, so compare latency within a session."
+)
+
+#: name -> (value per ticket, percentile, caveat).
+PERCENTILE_METRICS: dict[str, tuple[SampleFn, float, str]] = {
+    "latency_p50_resolved_s": (_resolved_latency, 0.50, _LATENCY_CAVEAT),
+    "latency_p95_resolved_s": (_resolved_latency, 0.95, _LATENCY_CAVEAT),
+}
+
+#: The AgentResult field a metric cannot be computed without.
+_REQUIRES = {
+    "cost_per_resolved_usd": "cost_usd",
+    "latency_p50_resolved_s": "elapsed_s",
+    "latency_p95_resolved_s": "elapsed_s",
 }
 
 
@@ -146,23 +195,39 @@ def _percentile(sorted_values: list[float], q: float) -> float:
     return sorted_values[low] + (sorted_values[high] - sorted_values[low]) * (pos - low)
 
 
+def _sample_percentile(values: list[float | None], q: float) -> float | None:
+    present = sorted(v for v in values if v is not None)
+    return _percentile(present, q) if present else None
+
+
 def bootstrap_ci(
     pairs: list[Contribution],
     resamples: int = DEFAULT_RESAMPLES,
     seed: int = DEFAULT_SEED,
     alpha: float = 0.05,
 ) -> tuple[float | None, float | None, int]:
-    """Percentile bootstrap over tickets. Returns (low, high, undefined_count)."""
-    if not pairs:
+    """Percentile bootstrap of a ratio of sums over tickets. Returns
+    (low, high, undefined_count)."""
+    return _bootstrap(pairs, _ratio, resamples, seed, alpha)
+
+
+def _bootstrap(
+    items: list,
+    statistic: Callable[[list], float | None],
+    resamples: int,
+    seed: int,
+    alpha: float = 0.05,
+) -> tuple[float | None, float | None, int]:
+    if not items:
         return (None, None, resamples)
 
     rng = random.Random(seed)
-    n = len(pairs)
+    n = len(items)
     values: list[float] = []
     undefined = 0
     for _ in range(resamples):
-        sample = [pairs[rng.randrange(n)] for _ in range(n)]
-        value = _ratio(sample)
+        sample = [items[rng.randrange(n)] for _ in range(n)]
+        value = statistic(sample)
         if value is None:
             undefined += 1
         else:
@@ -187,6 +252,9 @@ def evaluate(
 ) -> list[MetricResult]:
     out: list[MetricResult] = []
     for name, (fn, caveat) in METRICS.items():
+        if not _reported(name, tickets, results):
+            out.append(_not_reported(name, caveat))
+            continue
         pairs = [fn(t, results[t.ticket_id]) for t in tickets]
         low, high, undefined = bootstrap_ci(pairs, resamples, seed)
         out.append(
@@ -201,4 +269,49 @@ def evaluate(
                 caveat=caveat,
             )
         )
+    for name, (fn, q, caveat) in PERCENTILE_METRICS.items():
+        if not _reported(name, tickets, results):
+            out.append(_not_reported(name, caveat))
+            continue
+        values = [fn(t, results[t.ticket_id]) for t in tickets]
+        statistic = lambda sample, q=q: _sample_percentile(sample, q)  # noqa: E731
+        low, high, undefined = _bootstrap(values, statistic, resamples, seed)
+        out.append(
+            MetricResult(
+                name=name,
+                value=statistic(values),
+                ci_low=low,
+                ci_high=high,
+                # Tickets in the sample, out of all tickets.
+                numerator=float(sum(v is not None for v in values)),
+                denominator=float(len(values)),
+                undefined_resamples=undefined,
+                caveat=caveat,
+            )
+        )
     return out
+
+
+def _reported(name: str, tickets: list[Ticket], results: dict[str, AgentResult]) -> bool:
+    field = _REQUIRES.get(name)
+    return field is None or all(getattr(results[t.ticket_id], field) is not None for t in tickets)
+
+
+def _not_reported(name: str, caveat: str) -> MetricResult:
+    return MetricResult(
+        name=name, value=None, ci_low=None, ci_high=None, numerator=0.0, denominator=0.0,
+        undefined_resamples=0,
+        caveat=f"Not reported by this agent: its results carry no {_REQUIRES[name]}. {caveat}",
+    )
+
+
+def format_value(name: str, value: float | None) -> str:
+    """A metric value in its own units: rates to 3 places, USD to 5 (a
+    ticket costs a fraction of a cent), seconds to 2."""
+    if value is None:
+        return "n/a"
+    if name.endswith("_usd"):
+        return f"{value:.5f}"
+    if name.endswith("_s"):
+        return f"{value:.2f}"
+    return f"{value:.3f}"

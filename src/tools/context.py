@@ -6,9 +6,12 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from src.memory import Memory, build_memory
+from src.memory.episodic import PgEpisodes
 from src.paths import resolve_var_dir
+from src.tools.dense import DensePolicyIndex
+from src.tools.embeddings import Embedder
 from src.tools.fixtures import FixtureBackend
-from src.tools.retrieval import RetrievalConfig
+from src.tools.retrieval import HybridPolicyIndex, RetrievalConfig
 from src.tools.store import WriteStore
 
 
@@ -38,3 +41,13 @@ class ToolContext:
             var_dir=resolved,
             memory=build_memory(retrieval, fixtures.history_seed()),
         )
+
+    def embedders(self) -> list[Embedder]:
+        """Every embedder behind these tools, for the cost meter (ADR 0009).
+        None under the lexical backend."""
+        policy = self.fixtures.policy
+        dense = policy.dense if isinstance(policy, HybridPolicyIndex) else policy
+        found = [dense.embedder] if isinstance(dense, DensePolicyIndex) else []
+        if isinstance(self.memory.episodes, PgEpisodes):
+            found.append(self.memory.episodes.embedder)
+        return found
