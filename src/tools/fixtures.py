@@ -12,8 +12,9 @@ only real customer data that exists. Reusing `evals.loader` rather than
 re-reading the JSON means the same validation guards a tool call and a dataset
 load, so the two cannot drift apart.
 
-Nothing here is generated at call time. Every value a read tool returns is
-already sitting in `evals/dataset/`.
+Nothing here is generated at call time. Every value this module returns is
+already sitting in `evals/dataset/`. History the agent writes during a run is
+memory's (`src/memory/`), seeded from here.
 """
 
 from __future__ import annotations
@@ -21,9 +22,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from evals.loader import load_customers
+from src.memory.episodic import Episode
 from src.paths import DEFAULT_DATASET_DIR
 from src.tools.errors import ToolInputError
-from src.tools.lexical import LexicalIndex
 from src.tools.retrieval import PolicySearch, RetrievalConfig, build_policy_index
 
 
@@ -31,6 +32,8 @@ class FixtureBackend:
     """Read-only access to the customer records and the policy corpus.
 
     `retrieval` picks the policy backend; `None` reads it from the environment.
+    A customer's history is not read from here at call time: it seeds memory
+    (`history_seed`), and memory answers for it from then on (ADR 0008).
     """
 
     def __init__(
@@ -42,62 +45,23 @@ class FixtureBackend:
         self._customers = load_customers(self.dataset_dir / "customers.json")
         self._policy = build_policy_index(self.dataset_dir / "policies", retrieval)
 
-        # Past contacts are indexed once, keyed "CUST-1520/H-4471" so a search
-        # can be filtered by customer without rebuilding the index.
-        self._past_index = LexicalIndex(
-            {
-                f"{customer_id}/{past.ticket_id}": f"{past.summary} {past.resolution}"
-                for customer_id, customer in self._customers.items()
-                for past in customer.past_tickets
-            }
-        )
-
     @property
     def policy(self) -> PolicySearch:
         return self._policy
 
     def customer(self, customer_id: str) -> dict:
-        """The account record `lookup_customer` returns."""
-        record = self._customers.get(customer_id)
-        if record is None:
-            raise ToolInputError(f"no customer record for {customer_id!r}")
-        return record.model_dump(mode="json")
+        """The account record `lookup_customer` returns, without its history."""
+        self.check_customer(customer_id)
+        return self._customers[customer_id].model_dump(mode="json", exclude={"past_tickets"})
 
-    def search_past_tickets(
-        self,
-        query: str,
-        customer_id: str | None = None,
-        limit: int = 5,
-    ) -> list[dict]:
-        """Prior contacts matching `query`, optionally for one customer only.
-
-        An unknown `customer_id` raises; a *known* customer with no history
-        returns an empty list, because "this customer has never written in"
-        is an answer the agent should be able to act on.
-        """
-        if customer_id is not None and customer_id not in self._customers:
+    def check_customer(self, customer_id: str) -> None:
+        if customer_id not in self._customers:
             raise ToolInputError(f"no customer record for {customer_id!r}")
 
-        matches: list[dict] = []
-        for hit in self._past_index.search(query):
-            owner, _, ticket_id = hit.doc_id.partition("/")
-            if customer_id is not None and owner != customer_id:
-                continue
-            past = next(
-                p
-                for p in self._customers[owner].past_tickets
-                if p.ticket_id == ticket_id
-            )
-            matches.append(
-                {
-                    "ticket_id": past.ticket_id,
-                    "customer_id": owner,
-                    "opened": past.opened,
-                    "summary": past.summary,
-                    "resolution": past.resolution,
-                    "score": round(hit.score, 6),
-                }
-            )
-            if len(matches) >= limit:
-                break
-        return matches
+    def history_seed(self) -> list[Episode]:
+        """Every customer's `past_tickets`: the prior history memory starts from."""
+        return [
+            Episode(customer_id, p.ticket_id, p.opened, p.summary, p.resolution)
+            for customer_id, customer in self._customers.items()
+            for p in customer.past_tickets
+        ]

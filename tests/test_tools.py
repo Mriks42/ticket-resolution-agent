@@ -12,6 +12,7 @@ import json
 import pytest
 
 from evals.loader import load_tickets
+from src.memory.close import Close
 from src.tools.catalog import CATALOG, Scope
 from src.tools.context import ToolContext
 from src.tools.errors import ToolInputError
@@ -111,6 +112,41 @@ def test_search_past_tickets_without_customer_id_searches_all(
     result = call(ctx, "search_past_tickets", query="unexplained line item invoice")
     ids = [m["ticket_id"] for m in result["matches"]]
     assert "H-4623" in ids
+
+
+def test_search_past_tickets_rejects_an_unknown_customer(ctx: ToolContext) -> None:
+    with pytest.raises(ToolInputError, match="CUST-9999"):
+        call(ctx, "search_past_tickets", query="anything", customer_id="CUST-9999")
+
+
+def test_search_past_tickets_returns_history_even_when_no_word_matches(ctx: ToolContext) -> None:
+    """No floor (ADR 0008): empty means "never written in", so a customer with
+    history gets it back however the query is phrased."""
+    result = call(ctx, "search_past_tickets", query="zzzqqx kumquat", customer_id="CUST-1520")
+    assert [m["ticket_id"] for m in result["matches"]] == ["H-4471", "H-5088"]
+    assert list(result["matches"][0]) == [
+        "ticket_id", "customer_id", "opened", "summary", "resolution", "score",
+    ]
+
+
+def test_lookup_customer_carries_the_history_memory_holds(ctx: ToolContext) -> None:
+    record = call(ctx, "lookup_customer", customer_id="CUST-1520")
+    assert [p["ticket_id"] for p in record["past_tickets"]] == ["H-4471", "H-5088"]
+    assert list(record["past_tickets"][0]) == ["ticket_id", "opened", "summary", "resolution"]
+    assert list(record)[-1] == "past_tickets", "same shape the model saw before memory existed"
+
+
+def test_what_one_context_remembers_another_does_not_see(tmp_path) -> None:
+    """One context per eval run, so one run's writes never reach the next."""
+    a = ToolContext.build(var_dir=tmp_path / "a", retrieval=RetrievalConfig())
+    b = ToolContext.build(var_dir=tmp_path / "b", retrieval=RetrievalConfig())
+    a.memory.remember(Close(
+        run_id="run-1", customer_id="CUST-1042", ticket_id="T-001", body="Charged twice.",
+        final_state="ESCALATE", date="2026-10-26",
+    ))
+    assert [p["ticket_id"] for p in call(a, "lookup_customer", customer_id="CUST-1042")["past_tickets"]] == ["T-001"]
+    assert call(b, "lookup_customer", customer_id="CUST-1042")["past_tickets"] == []
+    assert a.memory.namespace != b.memory.namespace
 
 
 # --- retrieve_policy -------------------------------------------------------

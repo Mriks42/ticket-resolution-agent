@@ -3,8 +3,9 @@
 Off is the stateless baseline of the memory ablation, so it has to be
 stateless in fact, not just missing a tool: the history search is not offered,
 a call to it is not run, and `lookup_customer` reaches neither the model nor
-the guardrail with the customer's past tickets in it. On, the loop behaves as
-it did before the switch existed. ADR 0008.
+the guardrail with the customer's past tickets in it, and nothing is written.
+On, every run is remembered at close — as the customer's words and a fixed
+outcome, never the model's prose. ADR 0008.
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ import pytest
 from evals.loader import load_tickets
 from evals.schema import Ticket
 from src.agent.config import AgentConfig
+from src.agent.llm import LLMError
 from src.tools.catalog import CATALOG
 from tests.agent_fakes import ScriptedLLM, completion
 
@@ -110,3 +112,107 @@ def test_memory_defaults_to_on_and_rejects_nonsense() -> None:
         AgentConfig.from_env({"MEMORY_ENABLED": "off"})
     with pytest.raises(ValueError, match="memory"):
         AgentConfig(memory="false")
+
+
+# --- what a closed run leaves behind ------------------------------------------------
+
+
+def history(ctx, customer_id: str):
+    return ctx.memory.episodes.history(customer_id)
+
+
+@pytest.mark.asyncio
+async def test_a_closed_ticket_is_remembered(make, tickets, ctx, trace) -> None:
+    t = tickets["T-001"]
+    llm = ScriptedLLM(
+        completion("send_reply", {"ticket_id": t.ticket_id, "body": "We are looking into this for you."}),
+    )
+    result = await make(llm).run(t)
+
+    [episode] = history(ctx, t.customer_id)
+    assert (episode.ticket_id, episode.summary) == (t.ticket_id, t.body)
+    assert episode.resolution == "Resolved by the agent; a reply was sent."
+    [written] = [e for e in trace.records(result.run_id) if e["event"] == "memory_written"]
+    assert written["episode"]["ticket_id"] == t.ticket_id
+    assert written["namespace"] == ctx.memory.namespace
+
+
+@pytest.mark.asyncio
+async def test_memory_off_writes_nothing(make, tickets, ctx, trace) -> None:
+    t = tickets["T-001"]
+    result = await make(ScriptedLLM(escalate(t)), memory=False).run(t)
+    assert history(ctx, t.customer_id) == []
+    assert [e for e in trace.records(result.run_id) if e["event"] == "memory_written"] == []
+
+
+@pytest.mark.asyncio
+async def test_a_repeat_customer_sees_the_earlier_ticket(make, tickets) -> None:
+    """What memory is for, and what the held-out set cannot test: no customer
+    there writes in twice."""
+    first = tickets["T-001"]
+    second = first.model_copy(update={"ticket_id": "T-001-B", "body": "Following up on my last message."})
+    llm = ScriptedLLM(
+        escalate(first),
+        completion("lookup_customer", {"customer_id": second.customer_id}),
+        escalate(second),
+    )
+    loop = make(llm)
+    await loop.run(first)
+    await loop.run(second)
+
+    past = json.loads(llm.last_observation(2))["past_tickets"]
+    assert [(p["ticket_id"], p["summary"], p["resolution"]) for p in past] == [
+        ("T-001", first.body, "Escalated to a human."),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_an_escalation_keeps_its_clause_ids_and_drops_its_words(make, tickets, ctx) -> None:
+    """The model's reason never enters memory: read back as the customer's
+    records, it would ground the model's next claims. Invented ids are dropped."""
+    t = tickets["T-001"]
+    llm = ScriptedLLM(completion("escalate", {
+        "ticket_id": t.ticket_id,
+        "reason": "PROSE-SENTINEL: policy is silent (ESC-001.6), see also ZZZ-999.1",
+    }))
+    await make(llm).run(t)
+    [episode] = history(ctx, t.customer_id)
+    assert episode.resolution == "Escalated to a human. Clauses cited: ESC-001.6."
+
+
+@pytest.mark.asyncio
+async def test_a_held_refund_is_remembered_as_held(make, tickets, ctx) -> None:
+    t = tickets["T-017"]  # $290, owner request: support-manager band
+    llm = ScriptedLLM(
+        completion("issue_refund", {"ticket_id": t.ticket_id, "amount": 290, "reason": "within the window"}),
+        completion("send_reply", {"ticket_id": t.ticket_id, "body": "Your refund has been submitted for approval."}),
+    )
+    result = await make(llm).run(t)
+    assert result.final_state == "PENDING_APPROVAL"
+    [episode] = history(ctx, t.customer_id)
+    assert episode.resolution == (
+        "Waiting on an approver. Refund of $290.00 held for approval. Clauses cited: ESC-001.2."
+    )
+
+
+@pytest.mark.asyncio
+async def test_an_issued_refund_is_remembered_as_issued(make, tickets, ctx) -> None:
+    t = tickets["T-001"]
+    llm = ScriptedLLM(
+        completion("issue_refund", {"ticket_id": t.ticket_id, "amount": 29, "reason": "duplicate charge"}),
+        completion("send_reply", {"ticket_id": t.ticket_id, "body": "Refunded."}),
+    )
+    await make(llm).run(t)
+    [episode] = history(ctx, t.customer_id)
+    assert episode.resolution == (
+        "Resolved by the agent; a reply was sent. Refund of $29.00 issued. Clauses cited: ESC-001.1."
+    )
+
+
+@pytest.mark.asyncio
+async def test_a_failed_run_is_remembered(make, tickets, ctx) -> None:
+    t = tickets["T-001"]
+    result = await make(ScriptedLLM(LLMError("provider down"))).run(t)
+    assert result.final_state == "FAILED"
+    [episode] = history(ctx, t.customer_id)
+    assert episode.resolution == "Escalated to a human; the agent could not complete the run."

@@ -15,6 +15,7 @@ depends on the event:
     guardrail      tool, mode (block | detect), violations [{kind, detail, sentence}]
     gate           tool, args, verdict, rule, clause, approver, detail, facts
     escalation_filed  filed_by (model | system), reason, status, message
+    memory_written namespace, episode — once per run, at close, memory on only
     run_finished   final_state, outcome, stop_reason, steps, tokens,
                    cost_usd, elapsed_s
 
@@ -34,7 +35,7 @@ from typing import Any
 EVENTS = frozenset(
     {
         "run_started", "transition", "llm_call", "observation", "guardrail", "gate",
-        "escalation_filed", "run_finished",
+        "escalation_filed", "memory_written", "run_finished",
     }
 )
 

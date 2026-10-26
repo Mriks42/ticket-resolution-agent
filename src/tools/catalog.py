@@ -59,7 +59,13 @@ class ToolSpec:
 
 
 def lookup_customer(ctx: ToolContext, *, customer_id: str) -> dict:
-    return ctx.fixtures.customer(customer_id)
+    """The account, then its history from memory, oldest first."""
+    record = ctx.fixtures.customer(customer_id)
+    record["past_tickets"] = [
+        {"ticket_id": e.ticket_id, "opened": e.opened, "summary": e.summary, "resolution": e.resolution}
+        for e in ctx.memory.episodes.history(customer_id)
+    ]
+    return record
 
 
 def search_past_tickets(
@@ -69,7 +75,22 @@ def search_past_tickets(
     customer_id: str | None = None,
     limit: int = DEFAULT_RETRIEVAL_LIMIT,
 ) -> dict:
-    matches = ctx.fixtures.search_past_tickets(query, customer_id, _limit(limit))
+    """Ranked by similarity to `query`. Scoped to one customer, it returns that
+    customer's whole history up to `limit`: empty means no history (ADR 0008)."""
+    if customer_id is not None:
+        ctx.fixtures.check_customer(customer_id)
+    hits = ctx.memory.episodes.search(query, customer_id, _limit(limit))
+    matches = [
+        {
+            "ticket_id": e.ticket_id,
+            "customer_id": e.customer_id,
+            "opened": e.opened,
+            "summary": e.summary,
+            "resolution": e.resolution,
+            "score": round(score, 6),
+        }
+        for e, score in hits
+    ]
     return {"query": query, "customer_id": customer_id, "matches": matches}
 
 

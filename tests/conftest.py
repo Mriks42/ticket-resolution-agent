@@ -5,8 +5,8 @@ clients against the bytes they really send and receive.
 
 `ctx`, `server`, `writer`, `trace` and `make` are the agent-loop rig: real
 tools on the lexical backend in an isolated var dir, a read-only server for the
-model's calls and a write-scoped one only the gate reaches, sharing one store
-and one audit log.
+model's calls and a write-scoped one only the gate reaches, sharing one store,
+one audit log and one in-process memory the loop writes to at close.
 
 `pg` gives a test its own Postgres schema, dropped afterwards, so tests never
 read or write the tables a dev run or an eval run uses. Tests that need it are
@@ -195,7 +195,7 @@ def trace(tmp_path) -> TraceLog:
 
 
 @pytest.fixture
-def make(server, writer, trace):
+def make(ctx, server, writer, trace):
     def build(llm, *, executor=None, write_executor=None, clock=time.monotonic, spend=None, **config):
         return AgentLoop(
             llm=llm,
@@ -205,6 +205,7 @@ def make(server, writer, trace):
             config=AgentConfig(**config),
             clock=clock,
             spend=spend,
+            memory_store=ctx.memory,
         )
 
     return build

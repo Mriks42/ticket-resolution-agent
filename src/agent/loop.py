@@ -65,12 +65,13 @@ import time
 import uuid
 from collections.abc import Callable, Iterable
 from dataclasses import asdict, dataclass, field, replace
+from datetime import datetime, timezone
 
 from evals.schema import AgentResult, Outcome, Ticket, Tool, ToolCall
 from src.agent.config import AgentConfig
 from src.agent.executor import MCPToolExecutor, Observation, ToolExecutor
 from src.agent.gate import Decision, Verdict, decide_refund, decide_reply
-from src.agent.guardrail import Fact, Sources, account_grounding, history_text, usd
+from src.agent.guardrail import Fact, Sources, account_grounding, cited_clause_ids, history_text, usd
 from src.agent.guardrail import check as check_claims
 from src.agent.llm import (
     Assistant,
@@ -90,6 +91,8 @@ from src.agent.prompt import Prompt, load_prompt
 from src.agent.states import TERMINAL, State, check
 from src.agent.trace import TraceLog
 from src.mcp.server import MCPServer
+from src.memory import Memory
+from src.memory.close import Close, Refund
 from src.tools.catalog import CATALOG
 from src.tools.context import ToolContext
 from src.tools.policy import Clause, load_policy_index
@@ -192,6 +195,10 @@ class _Run:
     reply_violations: list = field(default_factory=list)
     #: Gated actions waiting for an approver.
     held: list[dict] = field(default_factory=list)
+    #: Each refund the gate executed or held, for memory.
+    refunds: list[Refund] = field(default_factory=list)
+    #: Clause ids the gate decided under, for memory.
+    rested_on: set[str] = field(default_factory=set)
     #: Refunds on this ticket so far, executed or held. The gate bands the total.
     refunded: float = 0.0
     escalation_filed: bool = False
@@ -215,6 +222,7 @@ class AgentLoop:
         spend: SpendGuard | None = None,
         context: dict | None = None,
         clause_lookup: Callable[[str], Clause | None] | None = None,
+        memory_store: Memory | None = None,
     ) -> None:
         self._llm = llm
         self._executor = executor
@@ -227,6 +235,9 @@ class AgentLoop:
         self._spend = spend
         self._context = context or {}
         self._memory = config.memory
+        #: Where a closed run is remembered. None writes nothing; reads still
+        #: come through the tools, whose context holds the same store.
+        self._memory_store = memory_store
         self._schemas = tool_schemas(memory=self._memory)
         self._offered = [s.name for s in self._schemas]
 
@@ -260,6 +271,12 @@ class AgentLoop:
 
         if run.state in (State.ESCALATE, State.FAILED) and not run.escalation_filed:
             await self._file_escalation(run, run.stop_reason or "stopped", filed_by="system")
+
+        if self._memory and self._memory_store is not None:
+            # A failed write raises out of run(), like the spend cap: an eval
+            # whose memory arm silently lost its writes must not report.
+            written = self._memory_store.remember(self._close(run))
+            self._trace.emit(run.run_id, "memory_written", **written)
 
         self._trace.emit(
             run.run_id,
@@ -458,6 +475,7 @@ class AgentLoop:
                 "approver": decision.approver, "clause": decision.clause,
             })
             run.refunded += args["amount"]
+            run.refunds.append(Refund(float(args["amount"]), "held"))
             run.context_facts.add(usd(args["amount"]))
             content = json.dumps({
                 "status": "pending_approval",
@@ -484,6 +502,7 @@ class AgentLoop:
             return self._go(run, State.RESOLVE, "reply sent")
         if call.name == "issue_refund" and obs.status == "ok":
             run.refunded += args["amount"]
+            run.refunds.append(Refund(float(args["amount"]), "issued"))
             run.context_facts.add(usd(args["amount"]))
         content = obs.for_model()
         if obs.status == "ok" and decision.clause:
@@ -581,9 +600,27 @@ class AgentLoop:
         )
         return obs
 
+    def _close(self, run: _Run) -> Close:
+        """What memory keeps of this run: its own records, no model prose.
+        Clause ids come from what it proposed, why it stopped and what the
+        gate decided under, keeping only ids that exist in the corpus."""
+        cited = cited_clause_ids(" ".join([*run.proposal_texts, run.stop_reason or ""]))
+        return Close(
+            run_id=run.run_id,
+            customer_id=run.ticket.customer_id,
+            ticket_id=run.ticket.ticket_id,
+            body=run.ticket.body,
+            final_state=run.state.value,
+            date=datetime.now(timezone.utc).date().isoformat(),
+            refunds=tuple(run.refunds),
+            clauses=tuple(sorted(c for c in cited | run.rested_on if self._clause_lookup(c))),
+        )
+
     def _gate_event(
         self, run: _Run, call: ToolCallRequest, args: dict, decision: Decision, facts: dict | None = None
     ) -> None:
+        if decision.clause:
+            run.rested_on.add(decision.clause)
         self._trace.emit(
             run.run_id, "gate",
             tool=call.name, args=args, verdict=decision.verdict.value, rule=decision.rule,
@@ -690,5 +727,10 @@ class LoopAgent(AgentLoop):
             trace=TraceLog.in_var_dir(context.var_dir),
             config=config,
             spend=SpendGuard.for_model(config.model, cap),
-            context={"retrieval": retrieval.describe(), "spend_cap_usd": cap},
+            context={
+                "retrieval": retrieval.describe(),
+                "memory": context.memory.describe(),
+                "spend_cap_usd": cap,
+            },
+            memory_store=context.memory,
         )

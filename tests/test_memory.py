@@ -1,0 +1,142 @@
+"""Episodic memory, against both backends.
+
+One contract, two implementations (ADR 0008): in-process over the TF-IDF
+index for the lexical configuration, pgvector for dense and hybrid. Each
+contract test runs against both; the pgvector ones use a throwaway schema and
+are skipped without `docker compose up -d`. Their embedder is the hashing one,
+so they pin the plumbing — scoping, ordering, namespaces, the cache — not how
+well a real model ranks.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from src.memory.close import Close, Refund
+from src.memory.episodic import Episode, InProcessEpisodes, PgEpisodes, resolution_text
+
+SEED = [
+    Episode("CUST-A", "H-1", "2026-06-01", "Charged twice for June.", "Refunded the duplicate."),
+    Episode("CUST-A", "H-2", "2026-07-01", "Asked how to export a project.", "Sent the export guide."),
+    Episode("CUST-B", "H-3", "2026-06-15", "Charged twice on the annual plan.", "Escalated to billing."),
+]
+
+
+@pytest.fixture(params=["in-process", "pgvector"])
+def make_store(request):
+    if request.param == "in-process":
+        return lambda namespace="ns-1": InProcessEpisodes(SEED, namespace=namespace)
+    pg = request.getfixturevalue("pg")
+    embedder = request.getfixturevalue("hashing_embedder")
+    return lambda namespace="ns-1": PgEpisodes(SEED, conn=pg, embedder=embedder, namespace=namespace)
+
+
+def ids(hits) -> list[str]:
+    return [e.ticket_id for e, _ in hits]
+
+
+# --- the contract ------------------------------------------------------------
+
+
+def test_history_is_the_customers_own_oldest_first(make_store) -> None:
+    store = make_store()
+    assert [e.ticket_id for e in store.history("CUST-A")] == ["H-1", "H-2"]
+    assert store.history("CUST-NONE") == []
+
+
+def test_search_ranks_the_customers_history_best_first(make_store) -> None:
+    hits = make_store().search("charged twice", "CUST-A", 5)
+    assert ids(hits) == ["H-1", "H-2"]
+    assert hits[0][1] > hits[1][1]
+
+
+def test_search_has_no_floor_so_empty_means_no_history(make_store) -> None:
+    """An off-topic query still returns the customer's history: an empty list
+    tells the agent the customer has never written in, so it must mean that."""
+    store = make_store()
+    assert set(ids(store.search("zzzqqx kumquat", "CUST-A", 5))) == {"H-1", "H-2"}
+    assert set(ids(store.search("", "CUST-A", 5))) == {"H-1", "H-2"}
+    assert store.search("charged twice", "CUST-NONE", 5) == []
+
+
+def test_search_without_a_customer_searches_everyone(make_store) -> None:
+    assert "H-3" in ids(make_store().search("charged twice annual plan", None, 5))
+
+
+def test_search_respects_the_limit(make_store) -> None:
+    assert len(make_store().search("charged", "CUST-A", 1)) == 1
+
+
+def test_an_added_episode_is_in_history_and_search(make_store) -> None:
+    store = make_store()
+    store.add(Episode("CUST-A", "T-9", "2026-10-26", "Charged twice again.", "Escalated to a human."))
+    assert [e.ticket_id for e in store.history("CUST-A")] == ["H-1", "H-2", "T-9"]
+    assert "T-9" in ids(store.search("charged twice", "CUST-A", 5))
+
+
+def test_adding_the_same_ticket_again_replaces_it(make_store) -> None:
+    store = make_store()
+    store.add(Episode("CUST-A", "T-9", "2026-10-26", "First.", "Escalated to a human."))
+    store.add(Episode("CUST-A", "T-9", "2026-10-26", "Second.", "Resolved by the agent."))
+    assert [e.summary for e in store.history("CUST-A") if e.ticket_id == "T-9"] == ["Second."]
+
+
+def test_namespaces_do_not_see_each_others_writes(make_store) -> None:
+    """Each eval run gets its own namespace, so one run's writes never reach
+    the next and a rerun starts from the same state."""
+    a, b = make_store("ns-a"), make_store("ns-b")
+    a.add(Episode("CUST-A", "T-9", "2026-10-26", "Only in a.", "Escalated to a human."))
+    assert "T-9" not in [e.ticket_id for e in b.history("CUST-A")]
+    assert "T-9" not in ids(b.search("only in a", "CUST-A", 5))
+    assert [e.ticket_id for e in b.history("CUST-A")] == ["H-1", "H-2"]
+
+
+# --- pgvector only -------------------------------------------------------------
+
+
+def test_seed_history_is_embedded_once_across_namespaces(pg, hashing_embedder) -> None:
+    PgEpisodes(SEED, conn=pg, embedder=hashing_embedder, namespace="ns-a")
+    PgEpisodes(SEED, conn=pg, embedder=hashing_embedder, namespace="ns-b")
+    assert hashing_embedder.texts_embedded == len(SEED)
+
+
+# --- what an agent-written episode holds ------------------------------------------
+
+
+def close(final_state: str, **kw) -> Close:
+    return Close(
+        run_id="run-1", customer_id="CUST-A", ticket_id="T-9", body="I was charged twice.",
+        final_state=final_state, date="2026-10-26", **kw,
+    )
+
+
+def test_an_episode_is_the_customers_words_and_a_fixed_outcome() -> None:
+    episode = Episode.from_close(close("RESOLVE", clauses=("REF-001.3",)))
+    assert episode == Episode(
+        "CUST-A", "T-9", "2026-10-26", "I was charged twice.",
+        "Resolved by the agent; a reply was sent. Clauses cited: REF-001.3.",
+    )
+
+
+@pytest.mark.parametrize(("state", "opening"), [
+    ("RESOLVE", "Resolved by the agent; a reply was sent."),
+    ("PENDING_APPROVAL", "Waiting on an approver."),
+    ("ESCALATE", "Escalated to a human."),
+    ("FAILED", "Escalated to a human; the agent could not complete the run."),
+])
+def test_every_terminal_state_has_an_outcome(state, opening) -> None:
+    assert resolution_text(close(state)) == opening
+
+
+def test_refunds_are_recorded_with_their_status() -> None:
+    text = resolution_text(close(
+        "PENDING_APPROVAL", refunds=(Refund(29.0, "issued"), Refund(290.0, "held")),
+    ))
+    assert text == (
+        "Waiting on an approver. Refund of $29.00 issued. Refund of $290.00 held for approval."
+    )
+
+
+def test_an_unknown_terminal_state_is_refused() -> None:
+    with pytest.raises(ValueError, match="PLAN"):
+        resolution_text(close("PLAN"))
